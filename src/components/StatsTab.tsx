@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { WorkoutSession, MuscleGroup } from '../types';
+import { WorkoutSession, MuscleGroup, CardioSession } from '../types';
 import { EXERCISES, MUSCLE_LABELS } from '../data/exercises';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -7,10 +7,11 @@ import {
 } from 'recharts';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { TrendingUp, BarChart2, Activity } from 'lucide-react';
+import { TrendingUp, BarChart2, Activity, Flame, Heart } from 'lucide-react';
 
 interface Props {
   sessions: WorkoutSession[];
+  cardioSessions?: CardioSession[];
 }
 
 const ALL_MUSCLES: MuscleGroup[] = [
@@ -25,10 +26,10 @@ const MUSCLE_COLORS: Record<string, string> = {
   forearms: '#94a3b8',
 };
 
-type ViewMode = 'exercise' | 'muscle';
+type ViewMode = 'exercise' | 'muscle' | 'calories';
 type MetricMode = 'maxWeight' | 'totalVolume' | 'totalReps';
 
-export default function StatsTab({ sessions }: Props) {
+export default function StatsTab({ sessions, cardioSessions = [] }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>('exercise');
   const [selectedExerciseId, setSelectedExerciseId] = useState(EXERCISES[0].id);
   const [selectedMuscle, setSelectedMuscle] = useState<MuscleGroup>('pectoral');
@@ -159,13 +160,19 @@ export default function StatsTab({ sessions }: Props) {
           onClick={() => setViewMode('exercise')}
           className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${viewMode === 'exercise' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'}`}
         >
-          <TrendingUp className="w-4 h-4" /> Por ejercicio
+          <TrendingUp className="w-4 h-4" /> Ejercicio
         </button>
         <button
           onClick={() => setViewMode('muscle')}
           className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${viewMode === 'muscle' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'}`}
         >
-          <Activity className="w-4 h-4" /> Por músculo
+          <Activity className="w-4 h-4" /> Músculo
+        </button>
+        <button
+          onClick={() => setViewMode('calories')}
+          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${viewMode === 'calories' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'}`}
+        >
+          <Flame className="w-4 h-4" /> Calorías
         </button>
       </div>
 
@@ -320,6 +327,224 @@ export default function StatsTab({ sessions }: Props) {
           )}
         </>
       )}
+
+      {viewMode === 'calories' && (
+        <CaloriesView sessions={completedSessions} cardioSessions={cardioSessions} />
+      )}
+    </div>
+  );
+}
+
+function CaloriesView({ sessions, cardioSessions }: { sessions: WorkoutSession[]; cardioSessions: CardioSession[] }) {
+  // Combine all activities for calorie tracking
+  const calorieData = useMemo(() => {
+    const dataMap: Record<string, { date: string; fullDate: string; strength: number; cardio: number; total: number }> = {};
+    
+    sessions.forEach(s => {
+      const dateKey = format(new Date(s.date), 'yyyy-MM-dd');
+      if (!dataMap[dateKey]) {
+        dataMap[dateKey] = {
+          date: format(new Date(s.date), 'dd/MM'),
+          fullDate: format(new Date(s.date), "d MMM yy", { locale: es }),
+          strength: 0,
+          cardio: 0,
+          total: 0,
+        };
+      }
+      dataMap[dateKey].strength += s.caloriesBurned || 0;
+      dataMap[dateKey].total += s.caloriesBurned || 0;
+    });
+    
+    cardioSessions.forEach(s => {
+      const dateKey = format(new Date(s.date), 'yyyy-MM-dd');
+      if (!dataMap[dateKey]) {
+        dataMap[dateKey] = {
+          date: format(new Date(s.date), 'dd/MM'),
+          fullDate: format(new Date(s.date), "d MMM yy", { locale: es }),
+          strength: 0,
+          cardio: 0,
+          total: 0,
+        };
+      }
+      dataMap[dateKey].cardio += s.caloriesBurned;
+      dataMap[dateKey].total += s.caloriesBurned;
+    });
+    
+    return Object.values(dataMap).sort((a, b) => 
+      new Date(a.fullDate).getTime() - new Date(b.fullDate).getTime()
+    );
+  }, [sessions, cardioSessions]);
+
+  // Weekly summary
+  const weeklyStats = useMemo(() => {
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    
+    const weekStrength = sessions
+      .filter(s => new Date(s.date) >= weekAgo)
+      .reduce((sum, s) => sum + (s.caloriesBurned || 0), 0);
+    
+    const weekCardio = cardioSessions
+      .filter(s => new Date(s.date) >= weekAgo)
+      .reduce((sum, s) => sum + s.caloriesBurned, 0);
+    
+    const weekCardioMinutes = cardioSessions
+      .filter(s => new Date(s.date) >= weekAgo)
+      .reduce((sum, s) => sum + s.duration, 0);
+    
+    return {
+      strength: weekStrength,
+      cardio: weekCardio,
+      total: weekStrength + weekCardio,
+      cardioMinutes: weekCardioMinutes,
+    };
+  }, [sessions, cardioSessions]);
+
+  // Cardio type distribution
+  const cardioDistribution = useMemo(() => {
+    const dist: Record<string, number> = {};
+    cardioSessions.forEach(s => {
+      dist[s.cardioTypeId] = (dist[s.cardioTypeId] || 0) + s.caloriesBurned;
+    });
+    
+    const cardioTypeNames: Record<string, string> = {
+      running: 'Correr',
+      cycling: 'Bicicleta',
+      swimming: 'Natación',
+      rowing: 'Remo',
+      elliptical: 'Elíptica',
+      walking: 'Caminar',
+      hiit: 'HIIT',
+      stairmaster: 'Escaladora',
+      jumping_rope: 'Cuerda',
+    };
+    
+    return Object.entries(dist)
+      .map(([id, calories]) => ({
+        name: cardioTypeNames[id] || id,
+        calories,
+      }))
+      .sort((a, b) => b.calories - a.calories);
+  }, [cardioSessions]);
+
+  const totalAllTime = sessions.reduce((sum, s) => sum + (s.caloriesBurned || 0), 0) +
+    cardioSessions.reduce((sum, s) => sum + s.caloriesBurned, 0);
+
+  return (
+    <div className="space-y-4">
+      {/* Weekly summary cards */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+          <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
+            <Flame size={16} className="text-orange-400" />
+            Esta semana
+          </div>
+          <div className="text-2xl font-bold text-orange-400">{weeklyStats.total.toLocaleString()}</div>
+          <div className="text-xs text-gray-500">kcal quemadas</div>
+        </div>
+        <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+          <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
+            <Heart size={16} className="text-red-400" />
+            Cardio
+          </div>
+          <div className="text-2xl font-bold text-green-400">{weeklyStats.cardioMinutes}</div>
+          <div className="text-xs text-gray-500">minutos esta semana</div>
+        </div>
+      </div>
+
+      {/* Breakdown */}
+      <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+        <h4 className="text-sm font-semibold mb-3">Desglose semanal</h4>
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-gray-400 text-sm flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-orange-500"></div>
+              Fuerza
+            </span>
+            <span className="font-semibold">{weeklyStats.strength.toLocaleString()} kcal</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-gray-400 text-sm flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-green-500"></div>
+              Cardio
+            </span>
+            <span className="font-semibold">{weeklyStats.cardio.toLocaleString()} kcal</span>
+          </div>
+          <div className="h-2 bg-gray-700 rounded-full overflow-hidden flex">
+            {weeklyStats.total > 0 && (
+              <>
+                <div 
+                  className="h-full bg-orange-500"
+                  style={{ width: `${(weeklyStats.strength / weeklyStats.total) * 100}%` }}
+                />
+                <div 
+                  className="h-full bg-green-500"
+                  style={{ width: `${(weeklyStats.cardio / weeklyStats.total) * 100}%` }}
+                />
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Calorie chart over time */}
+      {calorieData.length > 0 && (
+        <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+          <h3 className="text-white font-semibold mb-4">Calorías quemadas por día</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={calorieData.slice(-14)}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis dataKey="date" tick={{ fill: '#9ca3af', fontSize: 11 }} />
+              <YAxis tick={{ fill: '#9ca3af', fontSize: 11 }} />
+              <Tooltip
+                contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                labelStyle={{ color: '#f3f4f6' }}
+                labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate || ''}
+                formatter={(value, name) => [
+                  `${Number(value)} kcal`,
+                  name === 'strength' ? 'Fuerza' : name === 'cardio' ? 'Cardio' : 'Total'
+                ]}
+              />
+              <Bar dataKey="strength" stackId="a" fill="#f97316" name="strength" />
+              <Bar dataKey="cardio" stackId="a" fill="#22c55e" name="cardio" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Cardio distribution */}
+      {cardioDistribution.length > 0 && (
+        <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+          <h3 className="text-white font-semibold mb-4">Calorías por tipo de cardio</h3>
+          <div className="space-y-2">
+            {cardioDistribution.map(item => (
+              <div key={item.name} className="flex items-center gap-3">
+                <div className="flex-1">
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>{item.name}</span>
+                    <span className="text-green-400">{item.calories.toLocaleString()} kcal</span>
+                  </div>
+                  <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-green-500 rounded-full"
+                      style={{ 
+                        width: `${(item.calories / Math.max(...cardioDistribution.map(d => d.calories))) * 100}%` 
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* All time total */}
+      <div className="bg-gradient-to-br from-orange-600/20 to-red-600/20 rounded-xl p-4 border border-orange-600/30 text-center">
+        <div className="text-gray-400 text-sm mb-1">Total histórico</div>
+        <div className="text-3xl font-bold text-orange-400">{totalAllTime.toLocaleString()}</div>
+        <div className="text-gray-500 text-sm">calorías quemadas</div>
+      </div>
     </div>
   );
 }

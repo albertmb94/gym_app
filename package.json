@@ -9,13 +9,21 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/uuid": "^10.0.0",
+    "better-sqlite3": "^12.9.0",
     "clsx": "2.1.1",
+    "cors": "^2.8.6",
     "date-fns": "^4.1.0",
+    "express": "^5.2.1",
     "lucide-react": "^1.8.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.8.1",
-    "tailwind-merge": "3.4.0"
+    "tailwind-merge": "3.4.0",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.1.17",

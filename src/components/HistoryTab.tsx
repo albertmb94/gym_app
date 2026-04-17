@@ -3,7 +3,7 @@ import { WorkoutSession } from '../types';
 import { EXERCISES, MUSCLE_LABELS, WORKOUT_TYPE_LABELS, WORKOUT_TYPE_COLORS } from '../data/exercises';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronDown, ChevronUp, Trash2, Play, CheckCircle, Clock, Dumbbell } from 'lucide-react';
+import { ChevronDown, ChevronUp, Trash2, Play, CheckCircle, Clock, Dumbbell, Flame } from 'lucide-react';
 
 interface Props {
   sessions: WorkoutSession[];
@@ -83,6 +83,13 @@ export default function HistoryTab({ sessions, onDelete, onContinue }: Props) {
                   <div>
                     <span className="text-orange-400 font-bold text-sm">{session.durationMinutes}</span>
                     <span className="text-gray-500 text-xs ml-1">min</span>
+                  </div>
+                )}
+                {session.caloriesBurned && session.caloriesBurned > 0 && (
+                  <div className="flex items-center gap-1">
+                    <Flame className="w-3 h-3 text-orange-400" />
+                    <span className="text-orange-400 font-bold text-sm">{session.caloriesBurned}</span>
+                    <span className="text-gray-500 text-xs">kcal</span>
                   </div>
                 )}
               </div>

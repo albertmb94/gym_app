@@ -1,24 +1,24 @@
 import { useState, useEffect, useRef } from 'react';
-import { WorkoutSession as WorkoutSessionType, ExerciseLog, SetLog, UserProfile } from '../types';
+import { WorkoutSession as WorkoutSessionType, ExerciseLog, SetLog, Exercise, MuscleGroup } from '../types';
 import { MUSCLE_LABELS } from '../data/exercises';
+import { useExercises } from '../contexts/ExercisesContext';
 import { Plus, Trash2, Check, ChevronDown, ChevronUp, Timer, Save, X, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 interface Props {
   session: WorkoutSessionType;
-  profile: UserProfile | null;
   onSave: (session: WorkoutSessionType) => void;
   onClose: () => void;
   getSuggestedSets: (exerciseId: string, numSets: number, defaultReps: number, defaultWeight: number) => { reps: number; weight: number }[];
-  allExercises: any[];
 }
 
 function generateId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-export default function WorkoutSession({ session: initialSession, profile, onSave, onClose, getSuggestedSets, allExercises }: Props) {
+export default function WorkoutSession({ session: initialSession, onSave, onClose, getSuggestedSets }: Props) {
+  const { allExercises } = useExercises();
   const [session, setSession] = useState<WorkoutSessionType>(initialSession);
   const [expandedExercise, setExpandedExercise] = useState<string | null>(
     initialSession.exercises[0]?.id || null
@@ -103,13 +103,7 @@ export default function WorkoutSession({ session: initialSession, profile, onSav
   };
 
   const handleFinish = () => {
-    const durationMinutes = Math.max(1, Math.floor(timer / 60));
-    // Calculate burned calories: MET method for strength is MET = 5
-    // kcal = MET * 3.5 * weight(kg) / 200 * durationMinutes
-    const userWeight = profile?.details?.weight || 70;
-    const caloriesBurned = Math.round(5 * 3.5 * userWeight / 200 * durationMinutes);
-
-    const finished = { ...session, completed: true, durationMinutes, caloriesBurned };
+    const finished = { ...session, completed: true, durationMinutes: Math.floor(timer / 60) };
     onSave(finished);
     onClose();
   };
@@ -126,9 +120,9 @@ export default function WorkoutSession({ session: initialSession, profile, onSav
   const completedSets = session.exercises.reduce((sum, ex) => sum + ex.sets.filter(s => s.completed).length, 0);
   const totalSets = session.exercises.reduce((sum, ex) => sum + ex.sets.length, 0);
 
-  const filteredExercises = allExercises.filter(ex =>
+  const filteredExercises = allExercises.filter((ex: Exercise) =>
     ex.name.toLowerCase().includes(exerciseSearch.toLowerCase()) ||
-    ex.primaryMuscles.some((m: string) => MUSCLE_LABELS[m]?.toLowerCase().includes(exerciseSearch.toLowerCase()))
+    ex.primaryMuscles.some((m: MuscleGroup) => MUSCLE_LABELS[m]?.toLowerCase().includes(exerciseSearch.toLowerCase()))
   );
 
   return (
@@ -173,7 +167,7 @@ export default function WorkoutSession({ session: initialSession, profile, onSav
       {/* Exercise list */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {session.exercises.map((exLog) => {
-          const exercise = allExercises.find(e => e.id === exLog.exerciseId);
+          const exercise = allExercises.find((e: Exercise) => e.id === exLog.exerciseId);
           if (!exercise) return null;
           const isExpanded = expandedExercise === exLog.id;
           const completedCount = exLog.sets.filter(s => s.completed).length;
@@ -189,13 +183,13 @@ export default function WorkoutSession({ session: initialSession, profile, onSav
                   <img
                     src={exercise.imageUrl}
                     alt={exercise.name}
-                    className="w-12 h-12 rounded-lg object-cover flex-shrink-0 bg-gray-950"
+                    className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
                     onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=100&q=60'; }}
                   />
                   <div className="min-w-0">
                     <div className="font-semibold text-white text-sm truncate">{exercise.name}</div>
                     <div className="text-xs text-gray-400">
-                      {exercise.primaryMuscles.map((m: string) => MUSCLE_LABELS[m]).join(', ')}
+                      {exercise.primaryMuscles.map((m: MuscleGroup) => MUSCLE_LABELS[m]).join(', ')}
                     </div>
                     <div className="text-xs text-orange-400 font-medium">{completedCount}/{exLog.sets.length} series</div>
                   </div>
@@ -325,7 +319,7 @@ export default function WorkoutSession({ session: initialSession, profile, onSav
             </div>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {filteredExercises.map(ex => {
+            {filteredExercises.map((ex: Exercise) => {
               const alreadyAdded = session.exercises.some(e => e.exerciseId === ex.id);
               return (
                 <button
@@ -346,8 +340,8 @@ export default function WorkoutSession({ session: initialSession, profile, onSav
                   />
                   <div>
                     <div className="text-white font-medium text-sm">{ex.name}</div>
-                    <div className="text-orange-400 text-xs">{ex.primaryMuscles.map((m: string) => MUSCLE_LABELS[m]).join(', ')}</div>
-                    <div className="text-gray-500 text-xs">{ex.secondaryMuscles.map((m: string) => MUSCLE_LABELS[m]).join(' · ')}</div>
+                    <div className="text-orange-400 text-xs">{ex.primaryMuscles.map((m: MuscleGroup) => MUSCLE_LABELS[m]).join(', ')}</div>
+                    <div className="text-gray-500 text-xs">{ex.secondaryMuscles.map((m: MuscleGroup) => MUSCLE_LABELS[m]).join(' · ')}</div>
                   </div>
                   {alreadyAdded && <span className="ml-auto text-xs text-gray-500">Ya añadido</span>}
                 </button>

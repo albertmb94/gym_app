@@ -1,19 +1,16 @@
 import { useState } from 'react';
-import { WorkoutTemplate, TemplateExercise, WeeklyPlan, WorkoutType } from '../types';
+import { WorkoutTemplate, TemplateExercise, WeeklyPlan, WorkoutType, Exercise } from '../types';
 import { MUSCLE_LABELS, WORKOUT_TYPE_LABELS, WORKOUT_TYPE_COLORS, DAYS_OF_WEEK, DEFAULT_TEMPLATES } from '../data/exercises';
-import { Plus, Trash2, Edit3, Save, X, ChevronDown, ChevronUp, Calendar, Dumbbell, RefreshCw } from 'lucide-react';
-
-import { Search } from 'lucide-react';
-import { Exercise } from '../types';
+import { Plus, Trash2, Edit3, Save, X, ChevronDown, ChevronUp, Calendar, Dumbbell, RefreshCw, Search } from 'lucide-react';
 
 interface Props {
   templates: WorkoutTemplate[];
   weeklyPlan: WeeklyPlan;
-  exercises: Exercise[];
   onSaveTemplate: (t: WorkoutTemplate) => void;
   onDeleteTemplate: (id: string) => void;
   onUpdateWeeklyPlan: (plan: WeeklyPlan) => void;
   getSuggestedSets: (exerciseId: string, numSets: number, defaultReps: number, defaultWeight: number) => { reps: number; weight: number }[];
+  allExercises: Exercise[]; // NEW: receive all exercises including custom
 }
 
 function generateId() {
@@ -22,9 +19,16 @@ function generateId() {
 
 const WORKOUT_TYPES: WorkoutType[] = ['push', 'pull', 'legs', 'upper', 'lower', 'full', 'custom'];
 
-export default function TemplatesTab({ templates, weeklyPlan, exercises, onSaveTemplate, onDeleteTemplate, onUpdateWeeklyPlan, getSuggestedSets }: Props) {
+export default function TemplatesTab({ 
+  templates, 
+  weeklyPlan, 
+  onSaveTemplate, 
+  onDeleteTemplate, 
+  onUpdateWeeklyPlan, 
+  getSuggestedSets,
+  allExercises, // NEW
+}: Props) {
   const [activeSection, setActiveSection] = useState<'plan' | 'templates'>('plan');
-  const [exerciseSearch, setExerciseSearch] = useState('');
   const [editingTemplate, setEditingTemplate] = useState<WorkoutTemplate | null>(null);
   const [expandedTemplate, setExpandedTemplate] = useState<string | null>(null);
   const [localPlan, setLocalPlan] = useState<WeeklyPlan>(weeklyPlan);
@@ -36,9 +40,15 @@ export default function TemplatesTab({ templates, weeklyPlan, exercises, onSaveT
   const [editExercises, setEditExercises] = useState<TemplateExercise[]>([]);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [targetSets, setTargetSets] = useState(14);
+  const [exerciseSearch, setExerciseSearch] = useState(''); // NEW: search state
 
   const allTemplates = [...DEFAULT_TEMPLATES, ...templates.filter(t => !DEFAULT_TEMPLATES.some(d => d.id === t.id))];
   const customTemplates = templates.filter(t => !DEFAULT_TEMPLATES.some(d => d.id === t.id));
+
+  // Helper to find exercise by ID from allExercises
+  const getExerciseById = (id: string): Exercise | undefined => {
+    return allExercises.find(e => e.id === id);
+  };
 
   const openCreate = () => {
     setEditingTemplate({
@@ -82,6 +92,7 @@ export default function TemplatesTab({ templates, weeklyPlan, exercises, onSaveT
     const suggested = getSuggestedSets(exerciseId, numSets, defaultReps, defaultWeight);
     setEditExercises(prev => [...prev, { exerciseId, sets: suggested }]);
     setShowExercisePicker(false);
+    setExerciseSearch(''); // Reset search
   };
 
   const removeExerciseFromTemplate = (idx: number) => {
@@ -139,6 +150,15 @@ export default function TemplatesTab({ templates, weeklyPlan, exercises, onSaveT
   };
 
   const getTemplateById = (id: string | null) => allTemplates.find(t => t.id === id) || null;
+
+  // Filter exercises for picker
+  const filteredExercises = allExercises.filter(ex => {
+    const matchesSearch = !exerciseSearch || 
+      ex.name.toLowerCase().includes(exerciseSearch.toLowerCase()) ||
+      ex.primaryMuscles.some(m => MUSCLE_LABELS[m]?.toLowerCase().includes(exerciseSearch.toLowerCase()));
+    const matchesType = ex.workoutType.includes(editType) || editType === 'custom';
+    return matchesSearch && matchesType;
+  });
 
   return (
     <div className="flex flex-col h-full">
@@ -248,12 +268,12 @@ export default function TemplatesTab({ templates, weeklyPlan, exercises, onSaveT
               <TemplateCard
                 key={t.id}
                 template={t}
-                exercises={exercises}
                 isExpanded={expandedTemplate === t.id}
                 onToggle={() => setExpandedTemplate(expandedTemplate === t.id ? null : t.id)}
                 onEdit={openEdit}
                 onDelete={null}
                 isDefault
+                allExercises={allExercises}
               />
             ))}
 
@@ -264,12 +284,12 @@ export default function TemplatesTab({ templates, weeklyPlan, exercises, onSaveT
                   <TemplateCard
                     key={t.id}
                     template={t}
-                    exercises={exercises}
                     isExpanded={expandedTemplate === t.id}
                     onToggle={() => setExpandedTemplate(expandedTemplate === t.id ? null : t.id)}
                     onEdit={openEdit}
                     onDelete={onDeleteTemplate}
                     isDefault={false}
+                    allExercises={allExercises}
                   />
                 ))}
               </>
@@ -348,7 +368,7 @@ export default function TemplatesTab({ templates, weeklyPlan, exercises, onSaveT
 
             <div className="space-y-3">
               {editExercises.map((ex, exIdx) => {
-                const exercise = exercises.find(e => e.id === ex.exerciseId);
+                const exercise = getExerciseById(ex.exerciseId);
                 if (!exercise) return null;
                 return (
                   <div key={exIdx} className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
@@ -419,31 +439,44 @@ export default function TemplatesTab({ templates, weeklyPlan, exercises, onSaveT
             </button>
           </div>
 
-          {/* Exercise picker sub-modal */}
+          {/* Exercise picker sub-modal with search */}
           {showExercisePicker && (
-            <div className="absolute inset-0 bg-gray-900/98 z-30 flex flex-col">
-              <div className="bg-gray-800 border-b border-gray-700 p-4 flex items-center gap-3">
-                <button onClick={() => { setShowExercisePicker(false); setExerciseSearch(''); }} className="text-gray-400 hover:text-white">
-                  <X className="w-5 h-5" />
-                </button>
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <div className="absolute inset-0 bg-gray-900/98 z-10 flex flex-col">
+              <div className="bg-gray-800 border-b border-gray-700 p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <button onClick={() => { setShowExercisePicker(false); setExerciseSearch(''); }} className="text-gray-400 hover:text-white">
+                    <X className="w-5 h-5" />
+                  </button>
+                  <h3 className="text-white font-medium">Seleccionar ejercicio</h3>
+                </div>
+                {/* Search input */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                   <input
                     type="text"
                     value={exerciseSearch}
                     onChange={e => setExerciseSearch(e.target.value)}
-                    placeholder="Buscar ejercicio..."
-                    className="w-full pl-9 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 text-sm"
+                    placeholder="Buscar por nombre o músculo..."
+                    className="w-full bg-gray-700 border border-gray-600 rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
                     autoFocus
                   />
+                  {exerciseSearch && (
+                    <button
+                      onClick={() => setExerciseSearch('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                {exercises
-                  .filter(ex => ex.workoutType.includes(editType) || editType === 'custom')
-                  .filter(ex => ex.name.toLowerCase().includes(exerciseSearch.toLowerCase()) ||
-                                ex.primaryMuscles.some(m => MUSCLE_LABELS[m]?.toLowerCase().includes(exerciseSearch.toLowerCase())))
-                  .map(ex => {
+                {filteredExercises.length === 0 ? (
+                  <div className="text-center text-gray-500 py-8">
+                    No se encontraron ejercicios
+                  </div>
+                ) : (
+                  filteredExercises.map(ex => {
                     const already = editExercises.some(e => e.exerciseId === ex.id);
                     return (
                       <button
@@ -455,14 +488,25 @@ export default function TemplatesTab({ templates, weeklyPlan, exercises, onSaveT
                         <img src={ex.imageUrl} alt={ex.name} className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
                           onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=100&q=60'; }}
                         />
-                        <div>
-                          <div className="text-white font-medium text-sm">{ex.name}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-white font-medium text-sm flex items-center gap-2">
+                            {ex.name}
+                            {ex.isCustom && (
+                              <span className="text-xs px-1.5 py-0.5 bg-purple-600/30 text-purple-400 rounded">
+                                Personalizado
+                              </span>
+                            )}
+                          </div>
                           <div className="text-orange-400 text-xs">{ex.primaryMuscles.map(m => MUSCLE_LABELS[m]).join(', ')}</div>
                           <div className="text-gray-500 text-xs">{ex.secondaryMuscles.map(m => MUSCLE_LABELS[m]).join(' · ')}</div>
                         </div>
+                        {already && (
+                          <span className="text-xs text-gray-500">Añadido</span>
+                        )}
                       </button>
                     );
-                  })}
+                  })
+                )}
               </div>
             </div>
           )}
@@ -473,17 +517,21 @@ export default function TemplatesTab({ templates, weeklyPlan, exercises, onSaveT
 }
 
 // TemplateCard component
-function TemplateCard({ template, exercises, isExpanded, onToggle, onEdit, onDelete, isDefault }: {
+function TemplateCard({ template, isExpanded, onToggle, onEdit, onDelete, isDefault, allExercises }: {
   template: WorkoutTemplate;
-  exercises: Exercise[];
   isExpanded: boolean;
   onToggle: () => void;
   onEdit: (t: WorkoutTemplate) => void;
   onDelete: ((id: string) => void) | null;
   isDefault: boolean;
+  allExercises: Exercise[];
 }) {
   const typeColor = WORKOUT_TYPE_COLORS[template.type] || '#6b7280';
   const totalSets = template.exercises.reduce((sum, e) => sum + e.sets.length, 0);
+
+  const getExerciseById = (id: string): Exercise | undefined => {
+    return allExercises.find(e => e.id === id);
+  };
 
   return (
     <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
@@ -523,7 +571,7 @@ function TemplateCard({ template, exercises, isExpanded, onToggle, onEdit, onDel
       {isExpanded && (
         <div className="border-t border-gray-700 p-3 space-y-2">
           {template.exercises.map((ex, i) => {
-            const exercise = exercises.find(e => e.id === ex.exerciseId);
+            const exercise = getExerciseById(ex.exerciseId);
             if (!exercise) return null;
             return (
               <div key={i} className="flex items-center gap-3 bg-gray-700/40 rounded-lg p-2">

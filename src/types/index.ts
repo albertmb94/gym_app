@@ -26,6 +26,32 @@ export interface Exercise {
   isCustom?: boolean;
 }
 
+export interface PhysicalProfile {
+  height: number; // cm
+  weight: number; // kg
+  age: number;
+  sex: 'male' | 'female';
+  restingHeartRate: number; // bpm
+  maxHeartRate: number; // bpm
+}
+
+export interface CardioType {
+  id: string;
+  name: string;
+  metValue: number; // Metabolic Equivalent of Task
+  icon: string;
+}
+
+export interface CardioSession {
+  id: string;
+  date: string;
+  cardioTypeId: string;
+  duration: number; // minutes
+  averageHeartRate: number;
+  caloriesBurned: number;
+  notes?: string;
+}
+
 export interface SetLog {
   id: string;
   reps: number;
@@ -49,15 +75,6 @@ export interface WorkoutSession {
   durationMinutes?: number;
   completed: boolean;
   caloriesBurned?: number;
-}
-
-export interface CardioSession {
-  id: string;
-  date: string;
-  type: 'Running' | 'Rowing' | 'Bicycle' | 'Swimming' | 'Other';
-  durationMinutes: number;
-  avgHR: number;
-  caloriesBurned: number;
 }
 
 export interface TemplateSet {
@@ -86,21 +103,12 @@ export interface WeeklyPlan {
   }[];
 }
 
-export interface UserDetails {
-  height: number;
-  weight: number;
-  age: number;
-  gender: 'male' | 'female';
-  restingHR: number;
-  maxHR: number;
-}
-
 export interface UserProfile {
   username: string;
   createdAt: string;
   weeklyPlan: WeeklyPlan;
   customTemplates: WorkoutTemplate[];
-  details?: UserDetails;
+  physicalProfile?: PhysicalProfile;
   customExercises?: Exercise[];
 }
 
