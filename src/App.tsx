@@ -34,6 +34,7 @@ export default function App() {
     deleteCardioSession,
     getAllExercises,
     saveExercise,
+    deleteExercise,
   } = useStorage();
 
   const [activeTab, setActiveTab] = useState<Tab>('home');
@@ -145,6 +146,7 @@ export default function App() {
             <TemplatesTab
               templates={templates}
               weeklyPlan={weeklyPlan}
+              exercises={exercises}
               onSaveTemplate={saveTemplate}
               onDeleteTemplate={deleteTemplate}
               onUpdateWeeklyPlan={updateWeeklyPlan}
@@ -155,6 +157,7 @@ export default function App() {
             <ExercisesTab
               exercises={exercises}
               onSaveExercise={saveExercise}
+              onDeleteExercise={deleteExercise}
             />
           )}
         </div>

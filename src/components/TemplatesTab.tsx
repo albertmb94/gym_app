@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { WorkoutTemplate, TemplateExercise, WeeklyPlan, WorkoutType } from '../types';
-import { EXERCISES, MUSCLE_LABELS, WORKOUT_TYPE_LABELS, WORKOUT_TYPE_COLORS, DAYS_OF_WEEK, DEFAULT_TEMPLATES } from '../data/exercises';
+import { MUSCLE_LABELS, WORKOUT_TYPE_LABELS, WORKOUT_TYPE_COLORS, DAYS_OF_WEEK, DEFAULT_TEMPLATES } from '../data/exercises';
 import { Plus, Trash2, Edit3, Save, X, ChevronDown, ChevronUp, Calendar, Dumbbell, RefreshCw } from 'lucide-react';
+
+import { Search } from 'lucide-react';
+import { Exercise } from '../types';
 
 interface Props {
   templates: WorkoutTemplate[];
   weeklyPlan: WeeklyPlan;
+  exercises: Exercise[];
   onSaveTemplate: (t: WorkoutTemplate) => void;
   onDeleteTemplate: (id: string) => void;
   onUpdateWeeklyPlan: (plan: WeeklyPlan) => void;
@@ -18,8 +22,9 @@ function generateId() {
 
 const WORKOUT_TYPES: WorkoutType[] = ['push', 'pull', 'legs', 'upper', 'lower', 'full', 'custom'];
 
-export default function TemplatesTab({ templates, weeklyPlan, onSaveTemplate, onDeleteTemplate, onUpdateWeeklyPlan, getSuggestedSets }: Props) {
+export default function TemplatesTab({ templates, weeklyPlan, exercises, onSaveTemplate, onDeleteTemplate, onUpdateWeeklyPlan, getSuggestedSets }: Props) {
   const [activeSection, setActiveSection] = useState<'plan' | 'templates'>('plan');
+  const [exerciseSearch, setExerciseSearch] = useState('');
   const [editingTemplate, setEditingTemplate] = useState<WorkoutTemplate | null>(null);
   const [expandedTemplate, setExpandedTemplate] = useState<string | null>(null);
   const [localPlan, setLocalPlan] = useState<WeeklyPlan>(weeklyPlan);
@@ -243,6 +248,7 @@ export default function TemplatesTab({ templates, weeklyPlan, onSaveTemplate, on
               <TemplateCard
                 key={t.id}
                 template={t}
+                exercises={exercises}
                 isExpanded={expandedTemplate === t.id}
                 onToggle={() => setExpandedTemplate(expandedTemplate === t.id ? null : t.id)}
                 onEdit={openEdit}
@@ -258,6 +264,7 @@ export default function TemplatesTab({ templates, weeklyPlan, onSaveTemplate, on
                   <TemplateCard
                     key={t.id}
                     template={t}
+                    exercises={exercises}
                     isExpanded={expandedTemplate === t.id}
                     onToggle={() => setExpandedTemplate(expandedTemplate === t.id ? null : t.id)}
                     onEdit={openEdit}
@@ -341,7 +348,7 @@ export default function TemplatesTab({ templates, weeklyPlan, onSaveTemplate, on
 
             <div className="space-y-3">
               {editExercises.map((ex, exIdx) => {
-                const exercise = EXERCISES.find(e => e.id === ex.exerciseId);
+                const exercise = exercises.find(e => e.id === ex.exerciseId);
                 if (!exercise) return null;
                 return (
                   <div key={exIdx} className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
@@ -414,34 +421,48 @@ export default function TemplatesTab({ templates, weeklyPlan, onSaveTemplate, on
 
           {/* Exercise picker sub-modal */}
           {showExercisePicker && (
-            <div className="absolute inset-0 bg-gray-900/98 z-10 flex flex-col">
+            <div className="absolute inset-0 bg-gray-900/98 z-30 flex flex-col">
               <div className="bg-gray-800 border-b border-gray-700 p-4 flex items-center gap-3">
-                <button onClick={() => setShowExercisePicker(false)} className="text-gray-400 hover:text-white">
+                <button onClick={() => { setShowExercisePicker(false); setExerciseSearch(''); }} className="text-gray-400 hover:text-white">
                   <X className="w-5 h-5" />
                 </button>
-                <h3 className="text-white font-medium">Seleccionar ejercicio</h3>
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={exerciseSearch}
+                    onChange={e => setExerciseSearch(e.target.value)}
+                    placeholder="Buscar ejercicio..."
+                    className="w-full pl-9 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 text-sm"
+                    autoFocus
+                  />
+                </div>
               </div>
               <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                {EXERCISES.filter(ex => ex.workoutType.includes(editType) || editType === 'custom').map(ex => {
-                  const already = editExercises.some(e => e.exerciseId === ex.id);
-                  return (
-                    <button
-                      key={ex.id}
-                      onClick={() => !already && addExerciseToTemplate(ex.id)}
-                      disabled={already}
-                      className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${already ? 'border-gray-700 opacity-50 cursor-not-allowed bg-gray-800/30' : 'border-gray-700 bg-gray-800 hover:border-orange-500 hover:bg-gray-700'}`}
-                    >
-                      <img src={ex.imageUrl} alt={ex.name} className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                        onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=100&q=60'; }}
-                      />
-                      <div>
-                        <div className="text-white font-medium text-sm">{ex.name}</div>
-                        <div className="text-orange-400 text-xs">{ex.primaryMuscles.map(m => MUSCLE_LABELS[m]).join(', ')}</div>
-                        <div className="text-gray-500 text-xs">{ex.secondaryMuscles.map(m => MUSCLE_LABELS[m]).join(' · ')}</div>
-                      </div>
-                    </button>
-                  );
-                })}
+                {exercises
+                  .filter(ex => ex.workoutType.includes(editType) || editType === 'custom')
+                  .filter(ex => ex.name.toLowerCase().includes(exerciseSearch.toLowerCase()) ||
+                                ex.primaryMuscles.some(m => MUSCLE_LABELS[m]?.toLowerCase().includes(exerciseSearch.toLowerCase())))
+                  .map(ex => {
+                    const already = editExercises.some(e => e.exerciseId === ex.id);
+                    return (
+                      <button
+                        key={ex.id}
+                        onClick={() => !already && addExerciseToTemplate(ex.id)}
+                        disabled={already}
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${already ? 'border-gray-700 opacity-50 cursor-not-allowed bg-gray-800/30' : 'border-gray-700 bg-gray-800 hover:border-orange-500 hover:bg-gray-700'}`}
+                      >
+                        <img src={ex.imageUrl} alt={ex.name} className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                          onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=100&q=60'; }}
+                        />
+                        <div>
+                          <div className="text-white font-medium text-sm">{ex.name}</div>
+                          <div className="text-orange-400 text-xs">{ex.primaryMuscles.map(m => MUSCLE_LABELS[m]).join(', ')}</div>
+                          <div className="text-gray-500 text-xs">{ex.secondaryMuscles.map(m => MUSCLE_LABELS[m]).join(' · ')}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
               </div>
             </div>
           )}
@@ -452,8 +473,9 @@ export default function TemplatesTab({ templates, weeklyPlan, onSaveTemplate, on
 }
 
 // TemplateCard component
-function TemplateCard({ template, isExpanded, onToggle, onEdit, onDelete, isDefault }: {
+function TemplateCard({ template, exercises, isExpanded, onToggle, onEdit, onDelete, isDefault }: {
   template: WorkoutTemplate;
+  exercises: Exercise[];
   isExpanded: boolean;
   onToggle: () => void;
   onEdit: (t: WorkoutTemplate) => void;
@@ -501,7 +523,7 @@ function TemplateCard({ template, isExpanded, onToggle, onEdit, onDelete, isDefa
       {isExpanded && (
         <div className="border-t border-gray-700 p-3 space-y-2">
           {template.exercises.map((ex, i) => {
-            const exercise = EXERCISES.find(e => e.id === ex.exerciseId);
+            const exercise = exercises.find(e => e.id === ex.exerciseId);
             if (!exercise) return null;
             return (
               <div key={i} className="flex items-center gap-3 bg-gray-700/40 rounded-lg p-2">
