@@ -1,7 +1,12 @@
-import { useState } from 'react';
-import { CardioSession, PhysicalProfile } from '../types';
+import { useState, useRef } from 'react';
+import { CardioSession, PhysicalProfile, GpxRoute } from '../types';
 import { CARDIO_TYPES } from '../data/exercises';
-import { Activity, Clock, Heart, Flame, Plus, Trash2, X, Check, Calendar } from 'lucide-react';
+import { parseGpx } from '../lib/gpx';
+import MapRoute from './MapRoute';
+import {
+  Activity, Clock, Heart, Flame, Plus, Trash2, X, Check, Calendar,
+  MapPin, Mountain, Upload, Map as MapIcon, ChevronDown, ChevronUp
+} from 'lucide-react';
 
 interface CardioTabProps {
   cardioSessions: CardioSession[];
@@ -10,6 +15,9 @@ interface CardioTabProps {
   onDeleteSession: (sessionId: string) => void;
   estimateCalories: (cardioTypeId: string, duration: number, avgHR: number) => number;
 }
+
+// Sports that may benefit from a GPX track
+const OUTDOOR_SPORTS = ['running', 'cycling', 'walking', 'hiit'];
 
 export default function CardioTab({
   cardioSessions,
@@ -24,10 +32,24 @@ export default function CardioTab({
   const [avgHeartRate, setAvgHeartRate] = useState<number>(140);
   const [notes, setNotes] = useState('');
   const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [gpxRoute, setGpxRoute] = useState<GpxRoute | null>(null);
+  const [gpxError, setGpxError] = useState('');
+  const [expandedRouteId, setExpandedRouteId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const sortedSessions = [...cardioSessions].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
+
+  const resetForm = () => {
+    setSelectedCardio('running');
+    setDuration(30);
+    setAvgHeartRate(140);
+    setNotes('');
+    setSessionDate(new Date().toISOString().split('T')[0]);
+    setGpxRoute(null);
+    setGpxError('');
+  };
 
   const handleSave = () => {
     const calories = estimateCalories(selectedCardio, duration, avgHeartRate);
@@ -39,14 +61,44 @@ export default function CardioTab({
       averageHeartRate: avgHeartRate,
       caloriesBurned: calories,
       notes: notes || undefined,
+      gpxRoute: gpxRoute || undefined,
     };
     onSaveSession(session);
     setShowForm(false);
-    setNotes('');
+    resetForm();
+  };
+
+  const handleGpxUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setGpxError('');
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      const route = parseGpx(text);
+      if (!route) {
+        setGpxError('No se pudo leer el archivo GPX. Verifica el formato.');
+        return;
+      }
+      setGpxRoute(route);
+
+      // Auto-fill duration if route has timestamps
+      if (route.points.length > 1 && route.points[0].time && route.points[route.points.length - 1].time) {
+        const t1 = new Date(route.points[0].time as string).getTime();
+        const t2 = new Date(route.points[route.points.length - 1].time as string).getTime();
+        const minutes = Math.round((t2 - t1) / 60000);
+        if (minutes > 0 && minutes < 600) setDuration(minutes);
+      }
+    };
+    reader.onerror = () => setGpxError('Error al leer el archivo');
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   const estimatedCalories = estimateCalories(selectedCardio, duration, avgHeartRate);
   const selectedCardioType = CARDIO_TYPES.find(c => c.id === selectedCardio);
+  const isOutdoorSport = OUTDOOR_SPORTS.includes(selectedCardio);
 
   // Calculate weekly stats
   const weekAgo = new Date();
@@ -60,7 +112,7 @@ export default function CardioTab({
     const { maxHeartRate, restingHeartRate } = physicalProfile;
     const hrReserve = maxHeartRate - restingHeartRate;
     const intensity = ((hr - restingHeartRate) / hrReserve) * 100;
-    
+
     if (intensity < 60) return { zone: 'Zona 1', color: 'text-gray-400' };
     if (intensity < 70) return { zone: 'Zona 2', color: 'text-blue-400' };
     if (intensity < 80) return { zone: 'Zona 3', color: 'text-green-400' };
@@ -104,18 +156,23 @@ export default function CardioTab({
         </div>
       </div>
 
-      {/* Form Modal */}
+      {/* Form Modal — full-screen on mobile to avoid nav-bar overlap */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 pb-32">
-          <div className="bg-gray-800 rounded-xl w-full max-w-md max-h-[88vh] overflow-y-auto">
-            <div className="p-4 border-b border-gray-700 flex items-center justify-between">
+        <div className="fixed inset-0 bg-black/70 z-[60] flex items-stretch sm:items-center justify-center sm:p-4">
+          <div className="bg-gray-800 sm:rounded-xl w-full sm:max-w-md flex flex-col max-h-screen sm:max-h-[90vh]">
+            {/* Header */}
+            <div className="p-4 border-b border-gray-700 flex items-center justify-between flex-shrink-0">
               <h3 className="text-lg font-semibold">Nueva Sesión de Cardio</h3>
-              <button onClick={() => setShowForm(false)} className="p-2 hover:bg-gray-700 rounded-lg">
+              <button
+                onClick={() => { setShowForm(false); resetForm(); }}
+                className="p-2 hover:bg-gray-700 rounded-lg"
+              >
                 <X size={20} />
               </button>
             </div>
 
-            <div className="p-4 space-y-4">
+            {/* Scrollable body */}
+            <div className="p-4 space-y-4 overflow-y-auto flex-1">
               {/* Date */}
               <div>
                 <label className="block text-sm text-gray-400 mb-2">Fecha</label>
@@ -134,7 +191,10 @@ export default function CardioTab({
                   {CARDIO_TYPES.map((cardio) => (
                     <button
                       key={cardio.id}
-                      onClick={() => setSelectedCardio(cardio.id)}
+                      onClick={() => {
+                        setSelectedCardio(cardio.id);
+                        if (!OUTDOOR_SPORTS.includes(cardio.id)) setGpxRoute(null);
+                      }}
                       className={`p-3 rounded-lg text-center transition-all ${
                         selectedCardio === cardio.id
                           ? 'bg-green-600 ring-2 ring-green-400'
@@ -148,6 +208,66 @@ export default function CardioTab({
                 </div>
               </div>
 
+              {/* GPX Route Upload — only outdoor sports */}
+              {isOutdoorSport && (
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2 flex items-center gap-2">
+                    <MapIcon size={16} /> Ruta GPX (opcional)
+                  </label>
+                  {!gpxRoute ? (
+                    <>
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full py-3 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center gap-2 text-sm border-2 border-dashed border-gray-600"
+                      >
+                        <Upload size={18} />
+                        Cargar archivo .gpx
+                      </button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".gpx,application/gpx+xml,application/xml,text/xml"
+                        onChange={handleGpxUpload}
+                        className="hidden"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Sube una ruta de Strava, Garmin, Komoot, etc.
+                      </p>
+                    </>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="bg-gray-700 rounded-lg p-3 flex items-center justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium truncate">
+                            {gpxRoute.name || 'Ruta sin nombre'}
+                          </div>
+                          <div className="flex gap-3 text-xs text-gray-400 mt-1 flex-wrap">
+                            <span className="flex items-center gap-1">
+                              <MapPin size={12} /> {gpxRoute.distanceKm} km
+                            </span>
+                            {gpxRoute.elevationGain !== undefined && (
+                              <span className="flex items-center gap-1">
+                                <Mountain size={12} /> +{gpxRoute.elevationGain} m
+                              </span>
+                            )}
+                            <span>{gpxRoute.points.length} pts</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setGpxRoute(null)}
+                          className="p-2 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded ml-2"
+                          title="Quitar ruta"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                      <MapRoute route={gpxRoute} height={200} />
+                    </div>
+                  )}
+                  {gpxError && <p className="text-xs text-red-400 mt-1">{gpxError}</p>}
+                </div>
+              )}
+
               {/* Duration */}
               <div>
                 <label className="block text-sm text-gray-400 mb-2 flex items-center gap-2">
@@ -158,12 +278,13 @@ export default function CardioTab({
                   type="number"
                   value={duration}
                   onChange={(e) => setDuration(parseInt(e.target.value) || 0)}
+                  onFocus={(e) => e.target.select()}
                   className="w-full bg-gray-700 rounded-lg px-3 py-3 text-xl text-center"
                   min={1}
                   max={300}
                 />
-                <div className="flex justify-center gap-2 mt-2">
-                  {[15, 30, 45, 60].map((mins) => (
+                <div className="flex justify-center gap-2 mt-2 flex-wrap">
+                  {[15, 30, 45, 60, 90].map((mins) => (
                     <button
                       key={mins}
                       onClick={() => setDuration(mins)}
@@ -185,17 +306,18 @@ export default function CardioTab({
                   type="number"
                   value={avgHeartRate}
                   onChange={(e) => setAvgHeartRate(parseInt(e.target.value) || 0)}
+                  onFocus={(e) => e.target.select()}
                   className="w-full bg-gray-700 rounded-lg px-3 py-3 text-xl text-center"
-                  min={60}
+                  min={40}
                   max={220}
                 />
                 {physicalProfile && (
                   <div className="flex justify-between mt-2 text-xs text-gray-400">
-                    <span>Min: {physicalProfile.restingHeartRate} bpm</span>
+                    <span>Reposo: {physicalProfile.restingHeartRate}</span>
                     <span className={getHeartRateZone(avgHeartRate).color}>
                       {getHeartRateZone(avgHeartRate).zone}
                     </span>
-                    <span>Max: {physicalProfile.maxHeartRate} bpm</span>
+                    <span>Max: {physicalProfile.maxHeartRate}</span>
                   </div>
                 )}
               </div>
@@ -222,7 +344,10 @@ export default function CardioTab({
                   placeholder="¿Cómo te sentiste?"
                 />
               </div>
+            </div>
 
+            {/* Sticky footer with save button — always visible */}
+            <div className="p-4 border-t border-gray-700 bg-gray-800 flex-shrink-0 safe-area-bottom">
               <button
                 onClick={handleSave}
                 className="w-full bg-green-600 hover:bg-green-700 py-3 rounded-xl font-semibold flex items-center justify-center gap-2"
@@ -248,14 +373,16 @@ export default function CardioTab({
           sortedSessions.map((session) => {
             const cardioType = CARDIO_TYPES.find(c => c.id === session.cardioTypeId);
             const hrZone = getHeartRateZone(session.averageHeartRate);
+            const hasRoute = !!session.gpxRoute && session.gpxRoute.points.length > 0;
+            const isExpanded = expandedRouteId === session.id;
             return (
               <div key={session.id} className="bg-gray-800 rounded-xl p-4">
                 <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-3xl">{cardioType?.icon || '🏃'}</span>
-                    <div>
-                      <h4 className="font-semibold">{cardioType?.name || 'Cardio'}</h4>
-                      <div className="flex items-center gap-3 text-sm text-gray-400 mt-1">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <span className="text-3xl flex-shrink-0">{cardioType?.icon || '🏃'}</span>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-semibold truncate">{cardioType?.name || 'Cardio'}</h4>
+                      <div className="flex items-center gap-3 text-sm text-gray-400 mt-1 flex-wrap">
                         <span className="flex items-center gap-1">
                           <Calendar size={14} />
                           {new Date(session.date).toLocaleDateString('es-ES')}
@@ -269,13 +396,13 @@ export default function CardioTab({
                   </div>
                   <button
                     onClick={() => onDeleteSession(session.id)}
-                    className="p-2 hover:bg-red-500/20 rounded-lg text-gray-400 hover:text-red-400"
+                    className="p-2 hover:bg-red-500/20 rounded-lg text-gray-400 hover:text-red-400 flex-shrink-0"
                   >
                     <Trash2 size={18} />
                   </button>
                 </div>
 
-                <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-700">
+                <div className="flex items-center gap-x-4 gap-y-1 mt-3 pt-3 border-t border-gray-700 flex-wrap">
                   <div className="flex items-center gap-1 text-sm">
                     <Heart size={16} className="text-red-400" />
                     <span>{session.averageHeartRate} bpm</span>
@@ -285,7 +412,33 @@ export default function CardioTab({
                     <Flame size={16} />
                     <span>{session.caloriesBurned} kcal</span>
                   </div>
+                  {hasRoute && (
+                    <div className="flex items-center gap-1 text-sm text-green-400">
+                      <MapPin size={14} />
+                      <span>{session.gpxRoute!.distanceKm} km</span>
+                      {session.gpxRoute!.elevationGain !== undefined && (
+                        <span className="text-xs text-gray-400">+{session.gpxRoute!.elevationGain}m</span>
+                      )}
+                    </div>
+                  )}
                 </div>
+
+                {hasRoute && (
+                  <button
+                    onClick={() => setExpandedRouteId(isExpanded ? null : session.id)}
+                    className="mt-3 w-full flex items-center justify-center gap-2 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors"
+                  >
+                    <MapIcon size={16} />
+                    {isExpanded ? 'Ocultar mapa' : 'Ver ruta en mapa'}
+                    {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+                )}
+
+                {isExpanded && hasRoute && (
+                  <div className="mt-3">
+                    <MapRoute route={session.gpxRoute!} height={250} />
+                  </div>
+                )}
 
                 {session.notes && (
                   <p className="text-sm text-gray-400 mt-2 italic">"{session.notes}"</p>

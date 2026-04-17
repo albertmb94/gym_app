@@ -42,6 +42,20 @@ export interface CardioType {
   icon: string;
 }
 
+export interface GpxPoint {
+  lat: number;
+  lng: number;
+  ele?: number; // meters
+  time?: string; // ISO
+}
+
+export interface GpxRoute {
+  name?: string;
+  points: GpxPoint[];
+  distanceKm?: number;
+  elevationGain?: number;
+}
+
 export interface CardioSession {
   id: string;
   date: string;
@@ -50,7 +64,10 @@ export interface CardioSession {
   averageHeartRate: number;
   caloriesBurned: number;
   notes?: string;
+  gpxRoute?: GpxRoute;
 }
+
+export type ThemeName = 'dark' | 'black' | 'light' | 'contrast';
 
 export interface SetLog {
   id: string;

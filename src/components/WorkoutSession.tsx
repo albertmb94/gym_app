@@ -5,6 +5,7 @@ import { useExercises } from '../contexts/ExercisesContext';
 import { Plus, Trash2, Check, ChevronDown, ChevronUp, Timer, Save, X, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import NumericInput from './NumericInput';
 
 interface Props {
   session: WorkoutSessionType;
@@ -224,46 +225,25 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
                     >
                       <div className="col-span-1 text-gray-500 text-sm font-bold">{setIdx + 1}</div>
                       <div className="col-span-4">
-                        <input
-                          type="number"
+                        <NumericInput
                           value={set.weight}
-                          onChange={e => updateSet(exLog.id, set.id, 'weight', parseFloat(e.target.value) || 0)}
-                          onFocus={(e) => {
-                            // Clear default 0 to allow free typing
-                            if (parseFloat(e.target.value || '0') === 0) {
-                              e.target.value = '';
-                            }
-                            e.target.select();
-                          }}
-                          onBlur={(e) => {
-                            const val = parseFloat(e.target.value);
-                            updateSet(exLog.id, set.id, 'weight', isNaN(val) ? 0 : val);
-                          }}
-                          className="w-full text-center bg-gray-700 border border-gray-600 rounded-lg py-1.5 text-white text-sm focus:outline-none focus:border-orange-500"
-                          min="0"
-                          step="0.5"
+                          onChange={(v) => updateSet(exLog.id, set.id, 'weight', v)}
+                          decimals
+                          min={0}
+                          step={0.5}
                           placeholder="0"
+                          fallbackOnEmpty={0}
+                          className="w-full text-center bg-gray-700 border border-gray-600 rounded-lg py-1.5 text-white text-sm focus:outline-none focus:border-orange-500"
                         />
                       </div>
                       <div className="col-span-4">
-                        <input
-                          type="number"
+                        <NumericInput
                           value={set.reps}
-                          onChange={e => updateSet(exLog.id, set.id, 'reps', parseInt(e.target.value) || 0)}
-                          onFocus={(e) => {
-                            // Clear default 0 to allow free typing
-                            if (parseInt(e.target.value || '0') === 0) {
-                              e.target.value = '';
-                            }
-                            e.target.select();
-                          }}
-                          onBlur={(e) => {
-                            const val = parseInt(e.target.value);
-                            updateSet(exLog.id, set.id, 'reps', isNaN(val) ? 8 : val);
-                          }}
-                          className="w-full text-center bg-gray-700 border border-gray-600 rounded-lg py-1.5 text-white text-sm focus:outline-none focus:border-orange-500"
-                          min="0"
+                          onChange={(v) => updateSet(exLog.id, set.id, 'reps', v)}
+                          min={0}
                           placeholder="8"
+                          fallbackOnEmpty={8}
+                          className="w-full text-center bg-gray-700 border border-gray-600 rounded-lg py-1.5 text-white text-sm focus:outline-none focus:border-orange-500"
                         />
                       </div>
                       <div className="col-span-2 flex justify-center">

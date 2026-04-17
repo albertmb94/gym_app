@@ -45,7 +45,7 @@ function buildSessionFromTemplate(
   };
 }
 
-export default function HomeTab({ sessions, weeklyPlan, templates, username, onStartSession, onContinueWorkout, onEditSession, getSuggestedSets }: Props) {
+export default function HomeTab({ sessions, weeklyPlan, templates, username, onStartSession, onEditSession, getSuggestedSets }: Props) {
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
 
   const allTemplates = [...DEFAULT_TEMPLATES, ...templates.filter(t => !DEFAULT_TEMPLATES.some(d => d.id === t.id))];

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { PhysicalProfile } from '../types';
-import { User, Ruler, Weight, Heart, Activity, Calendar, Save, Check, Download, Upload } from 'lucide-react';
+import { User, Ruler, Weight, Heart, Activity, Calendar, Save, Check, Download, Upload, Palette } from 'lucide-react';
 import NumberPicker from './NumberPicker';
+import { useTheme, THEMES } from '../contexts/ThemeContext';
 
 interface ProfileTabProps {
   physicalProfile: PhysicalProfile | null;
@@ -24,6 +25,7 @@ export default function ProfileTab({
   onDownloadTemplate,
   onDownloadExerciseNames,
 }: ProfileTabProps) {
+  const { theme, setTheme } = useTheme();
   const [profile, setProfile] = useState<PhysicalProfile>({
     height: physicalProfile?.height || 170,
     weight: physicalProfile?.weight || 70,
@@ -297,6 +299,34 @@ export default function ProfileTab({
           </>
         )}
       </button>
+
+      {/* Theme picker */}
+      <div className="mt-6 bg-gray-800 rounded-xl p-4">
+        <h3 className="font-semibold mb-4 flex items-center gap-2">
+          <Palette className="text-pink-400" size={20} />
+          Tema de la app
+        </h3>
+        <div className="grid grid-cols-2 gap-2">
+          {THEMES.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTheme(t.id)}
+              className={`p-3 rounded-xl text-left transition-all border-2 ${
+                theme === t.id
+                  ? 'border-orange-500 bg-gray-700'
+                  : 'border-transparent bg-gray-700/50 hover:bg-gray-700'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xl">{t.emoji}</span>
+                <span className="font-semibold text-sm">{t.name}</span>
+                {theme === t.id && <Check size={14} className="text-orange-400 ml-auto" />}
+              </div>
+              <p className="text-xs text-gray-400 leading-tight">{t.description}</p>
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Export/Import Section */}
       <div className="mt-6 bg-gray-800 rounded-xl p-4">

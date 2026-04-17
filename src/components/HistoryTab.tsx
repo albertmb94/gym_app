@@ -81,27 +81,27 @@ export default function HistoryTab({ sessions, onDelete, onContinue }: Props) {
                 </div>
               </div>
 
-              <div className="flex gap-4 mt-3">
-                <div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3">
+                <div className="whitespace-nowrap">
                   <span className="text-orange-400 font-bold text-sm">{totalVolume.toLocaleString()}</span>
                   <span className="text-gray-500 text-xs ml-1">kg vol.</span>
                 </div>
-                <div>
+                <div className="whitespace-nowrap">
                   <span className="text-orange-400 font-bold text-sm">{completedSets}/{totalSets}</span>
                   <span className="text-gray-500 text-xs ml-1">series</span>
                 </div>
-                <div>
+                <div className="whitespace-nowrap">
                   <span className="text-orange-400 font-bold text-sm">{session.exercises.length}</span>
                   <span className="text-gray-500 text-xs ml-1">ejercicios</span>
                 </div>
                 {session.durationMinutes && (
-                  <div>
+                  <div className="whitespace-nowrap">
                     <span className="text-orange-400 font-bold text-sm">{session.durationMinutes}</span>
                     <span className="text-gray-500 text-xs ml-1">min</span>
                   </div>
                 )}
                 {session.caloriesBurned && session.caloriesBurned > 0 && (
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 whitespace-nowrap">
                     <Flame className="w-3 h-3 text-orange-400" />
                     <span className="text-orange-400 font-bold text-sm">{session.caloriesBurned}</span>
                     <span className="text-gray-500 text-xs">kcal</span>

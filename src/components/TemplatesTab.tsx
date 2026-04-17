@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { WorkoutTemplate, TemplateExercise, WeeklyPlan, WorkoutType, Exercise } from '../types';
 import { MUSCLE_LABELS, WORKOUT_TYPE_LABELS, WORKOUT_TYPE_COLORS, DAYS_OF_WEEK, DEFAULT_TEMPLATES } from '../data/exercises';
 import { Plus, Trash2, Edit3, Save, X, ChevronDown, ChevronUp, Calendar, Dumbbell, RefreshCw, Search } from 'lucide-react';
+import NumericInput from './NumericInput';
 
 interface Props {
   templates: WorkoutTemplate[];
@@ -347,12 +348,12 @@ export default function TemplatesTab({
 
             <div>
               <label className="text-gray-400 text-sm mb-1 block">Series objetivo total</label>
-              <input
-                type="number"
+              <NumericInput
                 value={targetSets}
-                onChange={e => setTargetSets(parseInt(e.target.value) || 14)}
+                onChange={(v) => setTargetSets(v)}
                 min={4}
                 max={40}
+                fallbackOnEmpty={14}
                 className="w-24 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-orange-500"
               />
             </div>
@@ -395,21 +396,23 @@ export default function TemplatesTab({
                         <div key={setIdx} className="grid grid-cols-12 gap-2 items-center px-1">
                           <div className="col-span-1 text-gray-500 text-sm font-bold">{setIdx + 1}</div>
                           <div className="col-span-5">
-                            <input
-                              type="number"
+                            <NumericInput
                               value={set.weight}
-                              onChange={e => updateTemplateSet(exIdx, setIdx, 'weight', parseFloat(e.target.value) || 0)}
+                              onChange={(v) => updateTemplateSet(exIdx, setIdx, 'weight', v)}
+                              decimals
+                              min={0}
+                              step={0.5}
+                              fallbackOnEmpty={0}
                               className="w-full text-center bg-gray-700 border border-gray-600 rounded-lg py-1.5 text-white text-sm focus:outline-none focus:border-orange-500"
-                              min="0" step="0.5"
                             />
                           </div>
                           <div className="col-span-4">
-                            <input
-                              type="number"
+                            <NumericInput
                               value={set.reps}
-                              onChange={e => updateTemplateSet(exIdx, setIdx, 'reps', parseInt(e.target.value) || 0)}
+                              onChange={(v) => updateTemplateSet(exIdx, setIdx, 'reps', v)}
+                              min={0}
+                              fallbackOnEmpty={8}
                               className="w-full text-center bg-gray-700 border border-gray-600 rounded-lg py-1.5 text-white text-sm focus:outline-none focus:border-orange-500"
-                              min="0"
                             />
                           </div>
                           <div className="col-span-2 flex justify-center">
