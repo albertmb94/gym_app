@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { AppData, UserProfile, WorkoutSession, WorkoutTemplate, WeeklyPlan, PhysicalProfile, Exercise, CardioSession } from '../types';
 import { DEFAULT_TEMPLATES, EXERCISES } from '../data/exercises';
+import { fetchUserData, pushUserData, mergeServerData, isServerAvailable } from '../lib/serverSync';
 
 const STORAGE_KEY = 'gymtracker_data';
 
@@ -41,6 +42,65 @@ export function useStorage() {
       localStorage.removeItem('gymtracker_current_user');
     }
   }, [currentUser]);
+
+  // ----- Server sync (cross-device persistence) -----
+  const [serverOn, setServerOn] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error' | 'offline'>('idle');
+  const pushTimer = useRef<number | null>(null);
+  const lastPushed = useRef<string>('');
+  const initialPullDone = useRef<Set<string>>(new Set());
+
+  // Detect server availability once
+  useEffect(() => {
+    isServerAvailable().then(setServerOn);
+  }, []);
+
+  // On user change: pull latest from server (server is source of truth if newer)
+  useEffect(() => {
+    if (!currentUser || !serverOn) return;
+    if (initialPullDone.current.has(currentUser)) return;
+    initialPullDone.current.add(currentUser);
+    setSyncStatus('syncing');
+    fetchUserData(currentUser).then(remote => {
+      if (remote) {
+        setAppData(prev => {
+          const merged = mergeServerData(prev, currentUser, remote);
+          lastPushed.current = JSON.stringify({
+            users: { [currentUser]: merged.users[currentUser] },
+            sessions: { [currentUser]: merged.sessions[currentUser] || [] },
+            cardioSessions: { [currentUser]: (merged.cardioSessions || {})[currentUser] || [] },
+          });
+          return merged;
+        });
+      }
+      setSyncStatus('synced');
+    }).catch(() => setSyncStatus('error'));
+  }, [currentUser, serverOn]);
+
+  // Debounced push to server on any change
+  useEffect(() => {
+    if (!currentUser || !serverOn) return;
+    const slice = JSON.stringify({
+      users: { [currentUser]: appData.users[currentUser] },
+      sessions: { [currentUser]: appData.sessions[currentUser] || [] },
+      cardioSessions: { [currentUser]: (appData.cardioSessions || {})[currentUser] || [] },
+    });
+    if (slice === lastPushed.current) return;
+    if (pushTimer.current) window.clearTimeout(pushTimer.current);
+    setSyncStatus('syncing');
+    pushTimer.current = window.setTimeout(async () => {
+      const ok = await pushUserData(currentUser, appData);
+      if (ok) {
+        lastPushed.current = slice;
+        setSyncStatus('synced');
+      } else {
+        setSyncStatus('error');
+      }
+    }, 800);
+    return () => {
+      if (pushTimer.current) window.clearTimeout(pushTimer.current);
+    };
+  }, [appData, currentUser, serverOn]);
 
   const login = useCallback((username: string) => {
     const trimmed = username.trim();
@@ -537,5 +597,8 @@ export function useStorage() {
     // Export/Import
     exportUserData,
     importUserData,
+    // Sync info
+    serverOn,
+    syncStatus,
   };
 }

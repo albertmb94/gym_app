@@ -45,6 +45,8 @@ export default function App() {
     // Export/Import
     exportUserData,
     importUserData,
+    serverOn,
+    syncStatus,
   } = useStorage();
 
   const [activeTab, setActiveTab] = useState<Tab>('home');
@@ -118,7 +120,27 @@ export default function App() {
             </div>
             <span className="text-white font-bold">GymTracker</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {serverOn ? (
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                  syncStatus === 'synced'
+                    ? 'bg-green-900 text-green-300'
+                    : syncStatus === 'syncing'
+                    ? 'bg-yellow-900 text-yellow-300'
+                    : syncStatus === 'error'
+                    ? 'bg-red-900 text-red-300'
+                    : 'bg-gray-700 text-gray-400'
+                }`}
+                title={`Sincronización con servidor: ${syncStatus}`}
+              >
+                {syncStatus === 'syncing' ? '⟳ sync' : syncStatus === 'synced' ? '☁ sync' : syncStatus === 'error' ? '⚠ sync' : '☁'}
+              </span>
+            ) : (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-700 text-gray-500" title="Sin conexión al servidor — datos solo en este dispositivo">
+                local
+              </span>
+            )}
             <span className="text-gray-400 text-sm">{currentUser}</span>
             <button
               onClick={logout}

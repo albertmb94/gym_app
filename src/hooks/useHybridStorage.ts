@@ -38,12 +38,14 @@ const LOCAL_STORAGE_KEYS = {
 // Helper to detect if server is available
 async function isServerAvailable(): Promise<boolean> {
   try {
-    const response = await fetch('/api/users/login', { 
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: '__health_check__' })
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+    const response = await fetch('/api/health', {
+      method: 'GET',
+      signal: controller.signal,
     });
-    return response.ok || response.status === 400;
+    clearTimeout(timeout);
+    return response.ok;
   } catch {
     return false;
   }

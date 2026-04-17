@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { PhysicalProfile } from '../types';
 import { User, Ruler, Weight, Heart, Activity, Calendar, Save, Check, Download, Upload } from 'lucide-react';
-import WheelPicker from './WheelPicker';
+import NumberPicker from './NumberPicker';
 
 interface ProfileTabProps {
   physicalProfile: PhysicalProfile | null;
@@ -119,13 +119,13 @@ export default function ProfileTab({
             <label className="block text-sm text-gray-400 mb-2 flex items-center gap-1">
               <Ruler size={14} /> Altura
             </label>
-            <WheelPicker
+            <NumberPicker
               value={profile.height}
               min={120}
               max={220}
               step={1}
               suffix=" cm"
-              label="Altura"
+              color="blue"
               onChange={(value) => setProfile({ ...profile, height: value })}
             />
           </div>
@@ -135,13 +135,13 @@ export default function ProfileTab({
             <label className="block text-sm text-gray-400 mb-2 flex items-center gap-1">
               <Weight size={14} /> Peso
             </label>
-            <WheelPicker
+            <NumberPicker
               value={profile.weight}
               min={30}
               max={200}
-              step={1}
+              step={0.5}
               suffix=" kg"
-              label="Peso"
+              color="purple"
               onChange={(value) => setProfile({ ...profile, weight: value })}
             />
           </div>
@@ -151,13 +151,13 @@ export default function ProfileTab({
             <label className="block text-sm text-gray-400 mb-2 flex items-center gap-1">
               <Calendar size={14} /> Edad
             </label>
-            <WheelPicker
+            <NumberPicker
               value={profile.age}
               min={10}
               max={100}
               step={1}
               suffix=" años"
-              label="Edad"
+              color="green"
               onChange={(value) => setProfile({ ...profile, age: value })}
             />
           </div>
@@ -203,13 +203,13 @@ export default function ProfileTab({
             <label className="block text-sm text-gray-400 mb-2">
               FC en reposo
             </label>
-            <WheelPicker
+            <NumberPicker
               value={profile.restingHeartRate}
               min={40}
               max={100}
               step={1}
               suffix=" bpm"
-              label="FC en reposo"
+              color="red"
               onChange={(value) => setProfile({ ...profile, restingHeartRate: value })}
             />
           </div>
@@ -219,13 +219,13 @@ export default function ProfileTab({
             <label className="block text-sm text-gray-400 mb-2">
               FC máxima
             </label>
-            <WheelPicker
+            <NumberPicker
               value={profile.maxHeartRate}
               min={120}
               max={220}
               step={1}
               suffix=" bpm"
-              label="FC máxima"
+              color="orange"
               onChange={(value) => setProfile({ ...profile, maxHeartRate: value })}
             />
             <p className="text-xs text-gray-500 mt-2">

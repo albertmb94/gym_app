@@ -9,10 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@libsql/client": "^0.17.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/uuid": "^10.0.0",
+    "@vercel/node": "^5.7.10",
     "better-sqlite3": "^12.9.0",
     "clsx": "2.1.1",
     "cors": "^2.8.6",
