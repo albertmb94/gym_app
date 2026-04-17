@@ -45,6 +45,8 @@ export default function App() {
     // Export/Import
     exportUserData,
     importUserData,
+    downloadTemplate,
+    downloadExerciseNames,
     serverOn,
     syncStatus,
   } = useStorage();
@@ -182,16 +184,18 @@ export default function App() {
         }}
       >
         <div className="min-h-full">
-          {activeTab === 'home' && (
-            <HomeTab
-              sessions={sessions}
-              weeklyPlan={weeklyPlan}
-              templates={allTemplates}
-              username={currentUser}
-              onStartSession={handleStartSession}
-              getSuggestedSets={getSuggestedSets}
-            />
-          )}
+           {activeTab === 'home' && (
+             <HomeTab
+               sessions={sessions}
+               weeklyPlan={weeklyPlan}
+               templates={allTemplates}
+               username={currentUser}
+               onStartSession={handleStartSession}
+               onContinueWorkout={handleContinueSession}
+               onEditSession={handleContinueSession}
+               getSuggestedSets={getSuggestedSets}
+             />
+           )}
           {activeTab === 'history' && (
             <HistoryTab
               sessions={sessions}
@@ -241,6 +245,8 @@ export default function App() {
               onLogout={logout}
               onExportData={exportUserData}
               onImportData={importUserData}
+              onDownloadTemplate={downloadTemplate}
+              onDownloadExerciseNames={downloadExerciseNames}
             />
           )}
         </div>

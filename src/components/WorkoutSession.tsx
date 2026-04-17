@@ -228,9 +228,21 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
                           type="number"
                           value={set.weight}
                           onChange={e => updateSet(exLog.id, set.id, 'weight', parseFloat(e.target.value) || 0)}
+                          onFocus={(e) => {
+                            // Clear default 0 to allow free typing
+                            if (parseFloat(e.target.value || '0') === 0) {
+                              e.target.value = '';
+                            }
+                            e.target.select();
+                          }}
+                          onBlur={(e) => {
+                            const val = parseFloat(e.target.value);
+                            updateSet(exLog.id, set.id, 'weight', isNaN(val) ? 0 : val);
+                          }}
                           className="w-full text-center bg-gray-700 border border-gray-600 rounded-lg py-1.5 text-white text-sm focus:outline-none focus:border-orange-500"
                           min="0"
                           step="0.5"
+                          placeholder="0"
                         />
                       </div>
                       <div className="col-span-4">
@@ -238,8 +250,20 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
                           type="number"
                           value={set.reps}
                           onChange={e => updateSet(exLog.id, set.id, 'reps', parseInt(e.target.value) || 0)}
+                          onFocus={(e) => {
+                            // Clear default 0 to allow free typing
+                            if (parseInt(e.target.value || '0') === 0) {
+                              e.target.value = '';
+                            }
+                            e.target.select();
+                          }}
+                          onBlur={(e) => {
+                            const val = parseInt(e.target.value);
+                            updateSet(exLog.id, set.id, 'reps', isNaN(val) ? 8 : val);
+                          }}
                           className="w-full text-center bg-gray-700 border border-gray-600 rounded-lg py-1.5 text-white text-sm focus:outline-none focus:border-orange-500"
                           min="0"
+                          placeholder="8"
                         />
                       </div>
                       <div className="col-span-2 flex justify-center">

@@ -11,6 +11,8 @@ interface Props {
   templates: WorkoutTemplate[];
   username: string;
   onStartSession: (session: WorkoutSession) => void;
+  onContinueWorkout: (session: WorkoutSession) => void;
+  onEditSession: (session: WorkoutSession) => void;
   getSuggestedSets: (exerciseId: string, numSets: number, defaultReps: number, defaultWeight: number) => { reps: number; weight: number }[];
 }
 
@@ -43,7 +45,7 @@ function buildSessionFromTemplate(
   };
 }
 
-export default function HomeTab({ sessions, weeklyPlan, templates, username, onStartSession, getSuggestedSets }: Props) {
+export default function HomeTab({ sessions, weeklyPlan, templates, username, onStartSession, onContinueWorkout, onEditSession, getSuggestedSets }: Props) {
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
 
   const allTemplates = [...DEFAULT_TEMPLATES, ...templates.filter(t => !DEFAULT_TEMPLATES.some(d => d.id === t.id))];
@@ -272,16 +274,20 @@ export default function HomeTab({ sessions, weeklyPlan, templates, username, onS
               const vol = s.exercises.reduce((sum, ex) =>
                 sum + ex.sets.filter(set => set.completed).reduce((s2, set) => s2 + set.reps * set.weight, 0), 0
               );
-              return (
-                <div key={s.id} className="flex items-center gap-3 p-3 bg-gray-800 rounded-xl border border-gray-700">
-                  <div className="w-2 h-10 rounded-full flex-shrink-0" style={{ backgroundColor: typeColor }} />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-white text-sm font-medium truncate">{s.name}</div>
-                    <div className="text-gray-500 text-xs">{format(new Date(s.date), "d MMM", { locale: es })} · {vol.toLocaleString()} kg vol.</div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-gray-600 flex-shrink-0" />
-                </div>
-              );
+               return (
+                 <div
+                   key={s.id}
+                   onClick={() => onEditSession(s)}
+                   className="flex items-center gap-3 p-3 bg-gray-800 rounded-xl border border-gray-700 cursor-pointer hover:border-orange-500 transition-colors"
+                 >
+                   <div className="w-2 h-10 rounded-full flex-shrink-0" style={{ backgroundColor: typeColor }} />
+                   <div className="flex-1 min-w-0">
+                     <div className="text-white text-sm font-medium truncate">{s.name}</div>
+                     <div className="text-gray-500 text-xs">{format(new Date(s.date), "d MMM", { locale: es })} · {vol.toLocaleString()} kg vol.</div>
+                   </div>
+                   <ChevronRight className="w-4 h-4 text-gray-600 flex-shrink-0" />
+                 </div>
+               );
             })}
           </div>
         </div>

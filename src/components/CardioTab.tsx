@@ -106,8 +106,8 @@ export default function CardioTab({
 
       {/* Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-800 rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 pb-32">
+          <div className="bg-gray-800 rounded-xl w-full max-w-md max-h-[88vh] overflow-y-auto">
             <div className="p-4 border-b border-gray-700 flex items-center justify-between">
               <h3 className="text-lg font-semibold">Nueva Sesión de Cardio</h3>
               <button onClick={() => setShowForm(false)} className="p-2 hover:bg-gray-700 rounded-lg">

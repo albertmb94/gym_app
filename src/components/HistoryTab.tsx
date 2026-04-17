@@ -44,26 +44,41 @@ export default function HistoryTab({ sessions, onDelete, onContinue }: Props) {
               className="p-4 cursor-pointer"
               onClick={() => setExpandedId(isExpanded ? null : session.id)}
             >
-              <div className="flex items-start justify-between">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span
-                      className="text-xs font-bold px-2 py-0.5 rounded-full"
-                      style={{ backgroundColor: typeColor + '30', color: typeColor }}
-                    >
-                      {WORKOUT_TYPE_LABELS[session.type]}
-                    </span>
-                    {session.completed
-                      ? <CheckCircle className="w-4 h-4 text-green-500" />
-                      : <Clock className="w-4 h-4 text-yellow-500" />
-                    }
-                  </div>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span
+                        className="text-xs font-bold px-2 py-0.5 rounded-full"
+                        style={{ backgroundColor: typeColor + '30', color: typeColor }}
+                      >
+                        {WORKOUT_TYPE_LABELS[session.type]}
+                      </span>
+                      {session.completed
+                        ? <CheckCircle className="w-4 h-4 text-green-500" />
+                        : <Clock className="w-4 h-4 text-yellow-500" />
+                      }
+                    </div>
                   <h3 className="text-white font-semibold">{session.name}</h3>
                   <p className="text-gray-400 text-sm">
                     {format(new Date(session.date), "EEEE, d 'de' MMMM yyyy", { locale: es })}
                   </p>
                 </div>
-                {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-400 flex-shrink-0" /> : <ChevronDown className="w-5 h-5 text-gray-400 flex-shrink-0" />}
+
+                <div className="flex items-center gap-1">
+                  {!session.completed && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onContinue(session);
+                      }}
+                      className="p-2 text-orange-400 hover:bg-orange-500/10 rounded-lg transition-colors"
+                      title="Editar entrenamiento"
+                    >
+                      <Play className="w-5 h-5" />
+                    </button>
+                  )}
+                  {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-400 flex-shrink-0" /> : <ChevronDown className="w-5 h-5 text-gray-400 flex-shrink-0" />}
+                </div>
               </div>
 
               <div className="flex gap-4 mt-3">

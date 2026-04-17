@@ -90,7 +90,10 @@ export default function NumberPicker({
 
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
     setIsFocused(true);
-    e.target.select();
+    // Select all text for easy replacement
+    setTimeout(() => {
+      e.target.select();
+    }, 10);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -142,6 +145,7 @@ export default function NumberPicker({
             onBlur={handleInputBlur}
             onKeyDown={handleKeyDown}
             className="bg-transparent text-white text-3xl font-bold text-center w-24 focus:outline-none focus:bg-gray-800 rounded-lg py-1"
+            autoComplete="off"
           />
           {suffix && (
             <span className="text-gray-400 text-base font-medium">{suffix.trim()}</span>

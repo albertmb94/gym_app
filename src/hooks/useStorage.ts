@@ -485,12 +485,12 @@ export function useStorage() {
   // Export all user data as JSON
   const exportUserData = useCallback(() => {
     if (!currentUser) return;
-    
+
     const profile = getProfile();
     const sessions = getSessions();
     const cardioSessionsData = getCardioSessions();
     const customExercisesData = getCustomExercises();
-    
+
     const exportData = {
       version: 1,
       exportDate: new Date().toISOString(),
@@ -500,11 +500,11 @@ export function useStorage() {
       cardioSessions: cardioSessionsData,
       customExercises: customExercisesData,
     };
-    
+
     const jsonString = JSON.stringify(exportData, null, 2);
     const blob = new Blob([jsonString], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    
+
     const a = document.createElement('a');
     a.href = url;
     a.download = `gymtracker_${currentUser}_${new Date().toISOString().split('T')[0]}.json`;
@@ -513,6 +513,43 @@ export function useStorage() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }, [currentUser, getProfile, getSessions, getCardioSessions, getCustomExercises]);
+
+  // Download CSV template with dummy data for Excel
+  const downloadTemplate = useCallback(() => {
+    const csvContent = `date,type,exercise_name,sets,reps,weight,notes
+2025-01-15,Push,Bench Press,4,8,85,"Buen entrenamiento de pecho"
+2025-01-15,Push,Overhead Press,3,10,60,""
+2025-01-17,Pull,Deadlift,4,6,120,""
+2025-01-17,Pull,Pull-ups,3,8,0,"Usa peso asistido si es necesario"`;
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'gymtracker_plantilla_importar.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, []);
+
+  // Download list of all exercise names to help with import matching
+  const downloadExerciseNames = useCallback(() => {
+    const allEx = getAllExercises();
+    const exerciseList = allEx.map(ex => ex.name).join('\n');
+
+    const blob = new Blob([`NOMBRE_EJERCICIO\n${exerciseList}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'gymtracker_nombres_ejercicios.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [getAllExercises]);
 
   // Import user data from JSON
   const importUserData = useCallback((jsonString: string): boolean => {
@@ -597,6 +634,8 @@ export function useStorage() {
     // Export/Import
     exportUserData,
     importUserData,
+    downloadTemplate,
+    downloadExerciseNames,
     // Sync info
     serverOn,
     syncStatus,

@@ -10,15 +10,19 @@ interface ProfileTabProps {
   onLogout: () => void;
   onExportData: () => void;
   onImportData: (data: string) => boolean;
+  onDownloadTemplate: () => void;
+  onDownloadExerciseNames: () => void;
 }
 
-export default function ProfileTab({ 
-  physicalProfile, 
-  onSaveProfile, 
-  username, 
+export default function ProfileTab({
+  physicalProfile,
+  onSaveProfile,
+  username,
   onLogout,
   onExportData,
   onImportData,
+  onDownloadTemplate,
+  onDownloadExerciseNames,
 }: ProfileTabProps) {
   const [profile, setProfile] = useState<PhysicalProfile>({
     height: physicalProfile?.height || 170,
@@ -205,7 +209,7 @@ export default function ProfileTab({
             </label>
             <NumberPicker
               value={profile.restingHeartRate}
-              min={40}
+              min={25}
               max={100}
               step={1}
               suffix=" bpm"
@@ -302,26 +306,43 @@ export default function ProfileTab({
         </h3>
 
         <p className="text-sm text-gray-400 mb-4">
-          Exporta todos tus datos (entrenamientos, ejercicios, cardio) a un archivo JSON que puedes guardar o importar en otro dispositivo.
+          Exporta todos tus datos (entrenamientos, ejercicios, cardio) o importa desde Excel/CSV.
+          Las filas sin coincidencia exacta de nombre de ejercicio serán omitidas.
         </p>
 
-        <div className="flex gap-3">
+        <div className="grid grid-cols-2 gap-3 mb-4">
           <button
             onClick={onExportData}
-            className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
+            className="py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
           >
-            <Download size={18} /> Exportar
+            <Download size={18} /> Exportar JSON
           </button>
-          
-          <label className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer">
-            <Upload size={18} /> Importar
+
+          <label className="py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer">
+            <Upload size={18} /> Importar JSON/CSV
             <input
               type="file"
-              accept=".json"
+              accept=".json,.csv"
               onChange={handleFileImport}
               className="hidden"
             />
           </label>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={onDownloadTemplate}
+            className="py-2.5 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 text-sm"
+          >
+            📋 Plantilla Excel
+          </button>
+
+          <button
+            onClick={onDownloadExerciseNames}
+            className="py-2.5 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 text-sm"
+          >
+            📋 Lista de Ejercicios
+          </button>
         </div>
 
         {importError && (
