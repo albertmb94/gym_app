@@ -287,6 +287,85 @@ export default function HomeTab({ sessions, weeklyPlan, templates, username, onS
         </div>
       )}
 
+      {/* Data backup & transfer section */}
+      <div className="bg-gray-800/50 rounded-xl border border-gray-800 p-4 space-y-3">
+        <h4 className="text-white text-sm font-semibold flex items-center gap-1.5">
+          <Dumbbell className="w-4 h-4 text-orange-400" /> Sincronización y Backups
+        </h4>
+        
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <button
+            onClick={() => {
+              const fullBackup = localStorage.getItem('gymtracker_data') || '{}';
+              const blob = new Blob([fullBackup], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `GymTrackerBackup_${username}.json`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="p-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl text-gray-200 font-medium text-center"
+          >
+            Exportar JSON
+          </button>
+
+          <label
+            className="p-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl text-gray-200 font-medium text-center cursor-pointer"
+          >
+            Importar JSON
+            <input
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                  try {
+                    const loaded = JSON.parse(evt.target?.result as string);
+                    if (loaded && typeof loaded === 'object') {
+                      localStorage.setItem('gymtracker_data', JSON.stringify(loaded));
+                      window.location.reload();
+                    }
+                  } catch {
+                    alert('Archivo JSON inválido');
+                  }
+                };
+                reader.readAsText(file);
+              }}
+            />
+          </label>
+        </div>
+
+        <button
+          onClick={() => {
+            let csv = "Fecha,Entrenamiento,Ejercicio,Set,Peso(kg),Reps,Completado\n";
+            sessions.forEach(s => {
+              s.exercises.forEach(exLog => {
+                const exName = EXERCISES.find(e => e.id === exLog.exerciseId)?.name || exLog.exerciseId;
+                exLog.sets.forEach((set, i) => {
+                  csv += `"${format(new Date(s.date), 'yyyy-MM-dd HH:mm')}",`;
+                  csv += `"${s.name}","${exName}",${i + 1},${set.weight},${set.reps},${set.completed ? 'Si' : 'No'}\n`;
+                });
+              });
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ReporteEntrenos_${username}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl text-orange-400 font-medium text-xs flex items-center justify-center gap-1.5"
+        >
+          Guardar como Tabla Excel/CSV
+        </button>
+      </div>
+
       {/* Template selector modal */}
       {showTemplateSelector && (
         <div className="fixed inset-0 bg-gray-900/95 z-50 flex flex-col">

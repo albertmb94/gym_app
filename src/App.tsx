@@ -34,6 +34,7 @@ export default function App() {
     deleteCardioSession,
     getAllExercises,
     saveExercise,
+    deleteExercise,
   } = useStorage();
 
   const [activeTab, setActiveTab] = useState<Tab>('home');
@@ -83,7 +84,7 @@ export default function App() {
   ];
 
   return (
-    <div className="flex flex-col h-screen bg-gray-900 max-w-lg mx-auto relative overflow-hidden">
+    <div className="flex flex-col h-[100dvh] max-h-[100dvh] bg-gray-900 max-w-lg mx-auto relative overflow-hidden">
       {/* Header */}
       <div className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2">
@@ -145,6 +146,7 @@ export default function App() {
             <TemplatesTab
               templates={templates}
               weeklyPlan={weeklyPlan}
+              exercises={exercises}
               onSaveTemplate={saveTemplate}
               onDeleteTemplate={deleteTemplate}
               onUpdateWeeklyPlan={updateWeeklyPlan}
@@ -155,6 +157,7 @@ export default function App() {
             <ExercisesTab
               exercises={exercises}
               onSaveExercise={saveExercise}
+              onDeleteExercise={deleteExercise}
             />
           )}
         </div>

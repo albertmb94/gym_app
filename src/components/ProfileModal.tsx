@@ -44,69 +44,103 @@ export default function ProfileModal({ profile, onUpdateDetails, onClose }: Prop
 
         {/* Form Body */}
         <div className="flex-1 overflow-y-auto py-4 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-gray-400 text-xs block mb-1">Edad</label>
+          <div className="space-y-3">
+            {/* Age & Gender */}
+            <div className="bg-gray-900 p-3 rounded-xl border border-gray-700/50">
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-gray-400 text-xs font-medium">Edad</label>
+                <span className="text-orange-400 font-bold text-sm font-mono">{age} años</span>
+              </div>
               <input
-                type="number"
+                type="range"
+                min="12"
+                max="100"
                 value={age}
-                onChange={e => setAge(Math.max(1, parseInt(e.target.value) || 0))}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-orange-500 text-sm font-semibold text-center"
+                onChange={e => setAge(parseInt(e.target.value))}
+                className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
               />
             </div>
-            <div>
-              <label className="text-gray-400 text-xs block mb-1">Sexo</label>
-              <select
-                value={gender}
-                onChange={e => setGender(e.target.value as 'male' | 'female')}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-orange-500 text-sm font-semibold"
-              >
-                <option value="male">Masculino</option>
-                <option value="female">Femenino</option>
-              </select>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-gray-400 text-xs block mb-1">Peso (kg)</label>
+            <div className="bg-gray-900 p-3 rounded-xl border border-gray-700/50">
+              <label className="text-gray-400 text-xs block mb-2 font-medium">Sexo</label>
+              <div className="flex gap-2">
+                {(['male', 'female'] as const).map(g => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => setGender(g)}
+                    className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-all ${gender === g ? 'bg-orange-500 border-transparent text-white' : 'bg-gray-800 text-gray-400 border-gray-700'}`}
+                  >
+                    {g === 'male' ? 'Masculino' : 'Femenino'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Weight */}
+            <div className="bg-gray-900 p-3 rounded-xl border border-gray-700/50">
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-gray-400 text-xs font-medium">Peso</label>
+                <span className="text-orange-400 font-bold text-sm font-mono">{weight} kg</span>
+              </div>
               <input
-                type="number"
-                step="0.1"
+                type="range"
+                min="30"
+                max="180"
+                step="0.5"
                 value={weight}
-                onChange={e => setWeight(Math.max(1, parseFloat(e.target.value) || 0))}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-orange-500 text-sm font-semibold text-center"
+                onChange={e => setWeight(parseFloat(e.target.value))}
+                className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
               />
             </div>
-            <div>
-              <label className="text-gray-400 text-xs block mb-1">Altura (cm)</label>
+
+            {/* Height */}
+            <div className="bg-gray-900 p-3 rounded-xl border border-gray-700/50">
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-gray-400 text-xs font-medium">Altura</label>
+                <span className="text-orange-400 font-bold text-sm font-mono">{height} cm</span>
+              </div>
               <input
-                type="number"
+                type="range"
+                min="110"
+                max="230"
                 value={height}
-                onChange={e => setHeight(Math.max(1, parseInt(e.target.value) || 0))}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-orange-500 text-sm font-semibold text-center"
+                onChange={e => setHeight(parseInt(e.target.value))}
+                className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
               />
             </div>
-          </div>
 
-          <div>
-            <label className="text-gray-400 text-xs block mb-1">Frecuencia Cardíaca Basal (bpm)</label>
-            <input
-              type="number"
-              value={restingHR}
-              onChange={e => setRestingHR(Math.max(30, parseInt(e.target.value) || 0))}
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-orange-500 text-sm font-semibold text-center"
-            />
-          </div>
+            {/* Resting HR */}
+            <div className="bg-gray-900 p-3 rounded-xl border border-gray-700/50">
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-gray-400 text-xs font-medium">FC Basal</label>
+                <span className="text-orange-400 font-bold text-sm font-mono">{restingHR} bpm</span>
+              </div>
+              <input
+                type="range"
+                min="35"
+                max="120"
+                value={restingHR}
+                onChange={e => setRestingHR(parseInt(e.target.value))}
+                className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
+              />
+            </div>
 
-          <div>
-            <label className="text-gray-400 text-xs block mb-1">Frecuencia Cardíaca Máxima (bpm)</label>
-            <input
-              type="number"
-              value={maxHR}
-              onChange={e => setMaxHR(Math.max(30, parseInt(e.target.value) || 0))}
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-orange-500 text-sm font-semibold text-center"
-            />
+            {/* Max HR */}
+            <div className="bg-gray-900 p-3 rounded-xl border border-gray-700/50">
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-gray-400 text-xs font-medium">FC Máxima</label>
+                <span className="text-orange-400 font-bold text-sm font-mono">{maxHR} bpm</span>
+              </div>
+              <input
+                type="range"
+                min="120"
+                max="220"
+                value={maxHR}
+                onChange={e => setMaxHR(parseInt(e.target.value))}
+                className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
+              />
+            </div>
           </div>
         </div>
 

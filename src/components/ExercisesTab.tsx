@@ -10,16 +10,19 @@ const ALL_MUSCLES: MuscleGroup[] = [
 
 const WORKOUT_TYPES: WorkoutType[] = ['push', 'pull', 'legs', 'upper', 'lower', 'full'];
 
+import { Trash } from 'lucide-react';
+
 interface Props {
   exercises: Exercise[];
   onSaveExercise: (exercise: Exercise) => void;
+  onDeleteExercise: (id: string) => void;
 }
 
 function generateId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-export default function ExercisesTab({ exercises, onSaveExercise }: Props) {
+export default function ExercisesTab({ exercises, onSaveExercise, onDeleteExercise }: Props) {
   const [search, setSearch] = useState('');
   const [selectedMuscle, setSelectedMuscle] = useState<MuscleGroup | null>(null);
   const [selectedType, setSelectedType] = useState<WorkoutType | null>(null);
@@ -202,6 +205,14 @@ export default function ExercisesTab({ exercises, onSaveExercise }: Props) {
                 >
                   <Edit2 className="w-3.5 h-3.5" />
                 </button>
+                {ex.isCustom && (
+                  <button
+                    onClick={e => { e.stopPropagation(); onDeleteExercise(ex.id); }}
+                    className="p-1.5 text-gray-500 hover:text-red-500"
+                  >
+                    <Trash className="w-3.5 h-3.5" />
+                  </button>
+                )}
                 {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-500 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" />}
               </div>
 

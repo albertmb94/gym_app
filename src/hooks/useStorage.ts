@@ -228,6 +228,20 @@ export function useStorage() {
     });
   }, [currentUser]);
 
+  const deleteExercise = useCallback((exerciseId: string) => {
+    if (!currentUser) return;
+    setAppData(prev => {
+      const user = prev.users[currentUser];
+      if (!user) return prev;
+      const existing = user.customExercises || [];
+      const updated = existing.filter(e => e.id !== exerciseId);
+      return {
+        ...prev,
+        users: { ...prev.users, [currentUser]: { ...user, customExercises: updated } },
+      };
+    });
+  }, [currentUser]);
+
   const getAllTemplates = useCallback((): WorkoutTemplate[] => {
     const profile = getProfile();
     const custom = profile?.customTemplates || [];
@@ -290,5 +304,6 @@ export function useStorage() {
     deleteCardioSession,
     getAllExercises,
     saveExercise,
+    deleteExercise,
   };
 }
