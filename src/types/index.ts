@@ -11,7 +11,9 @@ export type MuscleGroup =
   | 'hamstrings'
   | 'glutes'
   | 'calves'
-  | 'forearms';
+  | 'forearms'
+  | 'adductor'
+  | 'abductor';
 
 export type WorkoutType = 'push' | 'pull' | 'legs' | 'upper' | 'lower' | 'full' | 'custom';
 

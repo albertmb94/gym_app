@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useStorage } from './hooks/useStorage';
 import { ExercisesProvider } from './contexts/ExercisesContext';
+import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import LoginScreen from './components/LoginScreen';
 import HomeTab from './components/HomeTab';
 import HistoryTab from './components/HistoryTab';
@@ -16,6 +17,15 @@ import { Home, History, BarChart2, Calendar, Dumbbell, User, Activity, LogOut } 
 type Tab = 'home' | 'history' | 'stats' | 'templates' | 'exercises' | 'profile' | 'cardio';
 
 export default function App() {
+  return (
+    <LanguageProvider>
+      <AppInner />
+    </LanguageProvider>
+  );
+}
+
+function AppInner() {
+  const { t } = useLanguage();
   const {
     currentUser,
     login,
@@ -94,17 +104,17 @@ export default function App() {
 
   // Primary tabs (always visible)
   const primaryTabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: 'home', label: 'Inicio', icon: <Home className="w-5 h-5" /> },
-    { id: 'history', label: 'Historial', icon: <History className="w-5 h-5" /> },
-    { id: 'cardio', label: 'Cardio', icon: <Activity className="w-5 h-5" /> },
-    { id: 'stats', label: 'Stats', icon: <BarChart2 className="w-5 h-5" /> },
-    { id: 'profile', label: 'Perfil', icon: <User className="w-5 h-5" /> },
+    { id: 'home', label: t.nav.home, icon: <Home className="w-5 h-5" /> },
+    { id: 'history', label: t.nav.history, icon: <History className="w-5 h-5" /> },
+    { id: 'cardio', label: t.nav.cardio, icon: <Activity className="w-5 h-5" /> },
+    { id: 'stats', label: t.nav.stats, icon: <BarChart2 className="w-5 h-5" /> },
+    { id: 'profile', label: t.nav.profile, icon: <User className="w-5 h-5" /> },
   ];
 
   // Secondary tabs (accessible via profile or swipe)
   const secondaryTabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: 'templates', label: 'Plan', icon: <Calendar className="w-5 h-5" /> },
-    { id: 'exercises', label: 'Ejercicios', icon: <Dumbbell className="w-5 h-5" /> },
+    { id: 'templates', label: t.nav.plan, icon: <Calendar className="w-5 h-5" /> },
+    { id: 'exercises', label: t.nav.exercises, icon: <Dumbbell className="w-5 h-5" /> },
   ];
 
   // Calculate header height based on secondary tabs visibility
@@ -134,13 +144,12 @@ export default function App() {
                     ? 'bg-red-900 text-red-300'
                     : 'bg-gray-700 text-gray-400'
                 }`}
-                title={`Sincronización con servidor: ${syncStatus}`}
               >
-                {syncStatus === 'syncing' ? '⟳ sync' : syncStatus === 'synced' ? '☁ sync' : syncStatus === 'error' ? '⚠ sync' : '☁'}
+                {syncStatus === 'syncing' ? t.general.loading.replace('...','') : syncStatus === 'synced' ? '☁ sync' : syncStatus === 'error' ? '⚠ sync' : '☁'}
               </span>
             ) : (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-700 text-gray-500" title="Sin conexión al servidor — datos solo en este dispositivo">
-                local
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-700 text-gray-500">
+                {t.general.local}
               </span>
             )}
             <span className="text-gray-400 text-sm">{currentUser}</span>

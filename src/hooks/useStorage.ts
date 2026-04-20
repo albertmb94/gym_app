@@ -374,14 +374,14 @@ export function useStorage() {
   const saveCardioSession = useCallback((session: CardioSession) => {
     if (!currentUser) return;
     setAppData(prev => {
-      const userSessions = prev.cardioSessions[currentUser] || [];
+      const userSessions = (prev.cardioSessions || {})[currentUser] || [];
       const idx = userSessions.findIndex(s => s.id === session.id);
       const updated = idx >= 0
         ? userSessions.map(s => s.id === session.id ? session : s)
         : [...userSessions, session];
       return {
         ...prev,
-        cardioSessions: { ...prev.cardioSessions, [currentUser]: updated },
+        cardioSessions: { ...(prev.cardioSessions || {}), [currentUser]: updated },
       };
     });
   }, [currentUser]);
@@ -389,7 +389,7 @@ export function useStorage() {
   const deleteCardioSession = useCallback((sessionId: string) => {
     if (!currentUser) return;
     setAppData(prev => {
-      const userSessions = prev.cardioSessions[currentUser] || [];
+      const userSessions = (prev.cardioSessions || {})[currentUser] || [];
       return {
         ...prev,
         cardioSessions: { ...prev.cardioSessions, [currentUser]: userSessions.filter(s => s.id !== sessionId) },
@@ -571,7 +571,7 @@ export function useStorage() {
         const existingSessionIds = new Set((prev.sessions[currentUser] || []).map(s => s.id));
         const newSessions = (importData.sessions || []).filter((s: WorkoutSession) => !existingSessionIds.has(s.id));
         
-        const existingCardioIds = new Set((prev.cardioSessions[currentUser] || []).map(s => s.id));
+        const existingCardioIds = new Set(((prev.cardioSessions || {})[currentUser] || []).map(s => s.id));
         const newCardio = (importData.cardioSessions || []).filter((s: CardioSession) => !existingCardioIds.has(s.id));
         
         const existingExerciseIds = new Set((user.customExercises || []).map(e => e.id));
@@ -592,9 +592,9 @@ export function useStorage() {
             ...prev.sessions, 
             [currentUser]: [...(prev.sessions[currentUser] || []), ...newSessions] 
           },
-          cardioSessions: { 
-            ...prev.cardioSessions, 
-            [currentUser]: [...(prev.cardioSessions[currentUser] || []), ...newCardio] 
+          cardioSessions: {
+            ...(prev.cardioSessions || {}),
+            [currentUser]: [...((prev.cardioSessions || {})[currentUser] || []), ...newCardio]
           },
         };
       });
