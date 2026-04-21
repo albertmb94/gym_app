@@ -244,7 +244,7 @@ export default function StatsTab({ sessions, cardioSessions = [] }: Props) {
   );
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 pb-24 space-y-6">
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-gray-800 rounded-xl p-3 border border-gray-700 text-center">

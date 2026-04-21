@@ -79,7 +79,7 @@ export default function HistoryTab({ sessions, onDelete, onContinue }: Props) {
   }
 
   return (
-    <div className="p-4 space-y-3">
+    <div className="p-4 pb-24 space-y-3">
       {/* Filter bar */}
       <div className="space-y-2">
         <div className="flex gap-2">
@@ -104,7 +104,7 @@ export default function HistoryTab({ sessions, onDelete, onContinue }: Props) {
         </div>
 
         {filterMode === 'muscle' && (
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide" style={{ touchAction: 'pan-x' }}>
             {usedMuscles.map(m => (
               <button
                 key={m}

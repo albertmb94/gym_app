@@ -128,7 +128,7 @@ export default function HomeTab({ sessions, weeklyPlan, templates, username, onS
   // -----------------------------------------------------------------------
 
   return (
-    <div className="p-4 space-y-5">
+    <div className="p-4 pb-24 space-y-5">
       {/* Greeting */}
       <div className="flex items-center justify-between">
         <div>
@@ -228,7 +228,7 @@ export default function HomeTab({ sessions, weeklyPlan, templates, username, onS
             <div className="text-gray-400 text-sm mt-1">
               {todayTemplate.exercises.length} {t.history.exercises} · {todayTemplate.totalSets} {t.history.sets}
             </div>
-            <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+            <div className="flex gap-2 mt-3 overflow-x-auto pb-1" style={{ touchAction: 'pan-x' }}>
               {todayTemplate.exercises.map(ex => {
                 const exercise = EXERCISES.find(e => e.id === ex.exerciseId);
                 if (!exercise) return null;

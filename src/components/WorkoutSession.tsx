@@ -75,24 +75,22 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
   const [showAddExercise, setShowAddExercise] = useState(false);
   const [exerciseSearch, setExerciseSearch] = useState('');
 
-  // ── Drag & drop ─────────────────────────────────────────────────────────
+  // ── Drag & drop (mouse + touch) ─────────────────────────────────────────
   const dragIndexRef = useRef<number | null>(null);
+  const dragOverIndexRef = useRef<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const exerciseListRef = useRef<HTMLDivElement>(null);
 
-  const handleDragStart = (idx: number) => {
-    dragIndexRef.current = idx;
-  };
-
-  const handleDragOver = (e: React.DragEvent, idx: number) => {
-    e.preventDefault();
+  const updateDragOver = (idx: number | null) => {
+    dragOverIndexRef.current = idx;
     setDragOverIndex(idx);
   };
 
-  const handleDrop = (toIdx: number) => {
+  const performDrop = (toIdx: number | null) => {
     const fromIdx = dragIndexRef.current;
-    if (fromIdx === null || fromIdx === toIdx) {
+    if (fromIdx === null || toIdx === null || fromIdx === toIdx) {
       dragIndexRef.current = null;
-      setDragOverIndex(null);
+      updateDragOver(null);
       return;
     }
     setSession(prev => {
@@ -102,12 +100,50 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
       return { ...prev, exercises };
     });
     dragIndexRef.current = null;
-    setDragOverIndex(null);
+    updateDragOver(null);
   };
 
-  const handleDragEnd = () => {
-    dragIndexRef.current = null;
-    setDragOverIndex(null);
+  // ── Mouse / HTML5 DnD (desktop) ──────────────────────────────────────────
+  const handleDragStart = (idx: number) => { dragIndexRef.current = idx; };
+  const handleDragOver = (e: React.DragEvent, idx: number) => { e.preventDefault(); updateDragOver(idx); };
+  const handleDrop = (idx: number) => { performDrop(idx); };
+  const handleDragEnd = () => { dragIndexRef.current = null; updateDragOver(null); };
+
+  // ── Touch DnD (mobile) ───────────────────────────────────────────────────
+  const handleGripTouchStart = (e: React.TouchEvent, idx: number) => {
+    e.stopPropagation();
+    dragIndexRef.current = idx;
+    updateDragOver(idx);
+
+    const getIdxAtY = (clientY: number): number | null => {
+      if (!exerciseListRef.current) return null;
+      const cards = exerciseListRef.current.querySelectorAll<HTMLElement>('[data-drag-idx]');
+      for (const card of cards) {
+        const rect = card.getBoundingClientRect();
+        if (clientY >= rect.top && clientY <= rect.bottom) {
+          return parseInt(card.dataset.dragIdx ?? '-1');
+        }
+      }
+      return null;
+    };
+
+    const onTouchMove = (ev: TouchEvent) => {
+      ev.preventDefault(); // stop page scroll while dragging
+      const targetIdx = getIdxAtY(ev.touches[0].clientY);
+      if (targetIdx !== null) {
+        dragOverIndexRef.current = targetIdx;
+        setDragOverIndex(targetIdx);
+      }
+    };
+
+    const onTouchEnd = () => {
+      performDrop(dragOverIndexRef.current);
+      document.removeEventListener('touchmove', onTouchMove);
+      document.removeEventListener('touchend', onTouchEnd);
+    };
+
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend', onTouchEnd);
   };
 
   // ── Set mutations ────────────────────────────────────────────────────────
@@ -232,7 +268,7 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
       </div>
 
       {/* Exercise list */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div ref={exerciseListRef} className="flex-1 overflow-y-auto p-4 space-y-3">
         {session.exercises.map((exLog, idx) => {
           const exercise = allExercises.find((e: Exercise) => e.id === exLog.exerciseId);
           if (!exercise) return null;
@@ -243,6 +279,7 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
           return (
             <div
               key={exLog.id}
+              data-drag-idx={idx}
               draggable
               onDragStart={() => handleDragStart(idx)}
               onDragOver={(e) => handleDragOver(e, idx)}
@@ -252,8 +289,11 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
             >
               {/* Exercise header */}
               <div className="flex items-center p-3 gap-2">
-                {/* Drag handle */}
-                <div className="text-gray-600 hover:text-gray-400 cursor-grab active:cursor-grabbing touch-none flex-shrink-0 px-1">
+                {/* Drag handle — works for both mouse (cursor-grab) and touch (onTouchStart) */}
+                <div
+                  className="text-gray-600 hover:text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0 px-1 select-none"
+                  onTouchStart={(e) => handleGripTouchStart(e, idx)}
+                >
                   <GripVertical className="w-4 h-4" />
                 </div>
 

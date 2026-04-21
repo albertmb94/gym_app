@@ -167,7 +167,7 @@ function AppInner() {
 
         {/* Secondary tabs bar - shown when in profile */}
         {showSecondaryTabs && (
-          <div className="bg-gray-800/95 backdrop-blur-sm border-b border-gray-700 px-2 py-1.5 flex gap-2 overflow-x-auto scrollbar-hide">
+          <div className="bg-gray-800/95 backdrop-blur-sm border-b border-gray-700 px-2 py-1.5 flex gap-2 overflow-x-auto scrollbar-hide" style={{ touchAction: 'pan-x' }}>
             {secondaryTabs.map(tab => (
               <button
                 key={tab.id}
@@ -187,11 +187,12 @@ function AppInner() {
       </div>
 
       {/* Content area - with padding for fixed header and footer */}
-      <div 
+      <div
         className="h-full overflow-y-auto"
-        style={{ 
+        style={{
           paddingTop: showSecondaryTabs ? '100px' : '56px',
-          paddingBottom: '70px'
+          paddingBottom: '70px',
+          touchAction: 'pan-y', // prevent horizontal scroll strips from blocking vertical scroll
         }}
       >
         <div className="min-h-full">

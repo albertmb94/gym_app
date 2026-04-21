@@ -206,7 +206,7 @@ export default function ExercisesTab({
         </div>
 
         {/* Muscle filter */}
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide" style={{ touchAction: 'pan-x' }}>
           <button
             onClick={() => setSelectedMuscle(null)}
             className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${!selectedMuscle ? 'bg-orange-600 text-white' : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white'}`}
@@ -225,7 +225,7 @@ export default function ExercisesTab({
         </div>
 
         {/* Type filter */}
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide" style={{ touchAction: 'pan-x' }}>
           <button
             onClick={() => setSelectedType(null)}
             className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${!selectedType ? 'bg-gray-600 text-white' : 'bg-gray-800 border border-gray-700 text-gray-400'}`}
