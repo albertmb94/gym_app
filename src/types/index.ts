@@ -76,6 +76,7 @@ export interface SetLog {
   reps: number;
   weight: number; // kg
   completed: boolean;
+  isWarmup?: boolean; // warm-up sets are excluded from progressive overload suggestions
 }
 
 export interface ExerciseLog {
@@ -129,6 +130,7 @@ export interface UserProfile {
   customTemplates: WorkoutTemplate[];
   physicalProfile?: PhysicalProfile;
   customExercises?: Exercise[];
+  hiddenExerciseIds?: string[]; // default exercises hidden for this user only
 }
 
 export interface AppData {

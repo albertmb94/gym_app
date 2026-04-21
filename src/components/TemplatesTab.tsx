@@ -181,7 +181,7 @@ export default function TemplatesTab({
 
       <div className="flex-1 overflow-y-auto">
         {activeSection === 'plan' && (
-          <div className="p-4 space-y-5">
+          <div className="p-4 pb-24 space-y-5">
             <div>
               <h3 className="text-white font-semibold mb-1">¿Cuántos días entrenas por semana?</h3>
               <p className="text-gray-500 text-xs mb-3">Configura tu semana y asigna un tipo de entrenamiento a cada día.</p>
@@ -256,7 +256,7 @@ export default function TemplatesTab({
         )}
 
         {activeSection === 'templates' && (
-          <div className="p-4 space-y-3">
+          <div className="p-4 pb-24 space-y-3">
             <button
               onClick={openCreate}
               className="w-full py-3 border-2 border-dashed border-gray-700 text-gray-400 rounded-xl text-sm hover:border-orange-500 hover:text-orange-400 transition-colors flex items-center justify-center gap-2"
@@ -301,7 +301,7 @@ export default function TemplatesTab({
 
       {/* Template editor modal */}
       {editingTemplate && (
-        <div className="absolute inset-0 bg-gray-900 z-20 flex flex-col">
+        <div className="fixed inset-0 bg-gray-900 z-[60] flex flex-col">
           <div className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center gap-3 flex-shrink-0">
             <button onClick={() => setEditingTemplate(null)} className="text-gray-400 hover:text-white">
               <X className="w-5 h-5" />
@@ -444,7 +444,7 @@ export default function TemplatesTab({
 
           {/* Exercise picker sub-modal with search */}
           {showExercisePicker && (
-            <div className="absolute inset-0 bg-gray-900/98 z-10 flex flex-col">
+            <div className="fixed inset-0 bg-gray-900/98 z-[70] flex flex-col">
               <div className="bg-gray-800 border-b border-gray-700 p-4 space-y-3">
                 <div className="flex items-center gap-3">
                   <button onClick={() => { setShowExercisePicker(false); setExerciseSearch(''); }} className="text-gray-400 hover:text-white">

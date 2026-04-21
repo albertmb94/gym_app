@@ -237,13 +237,14 @@ export function useStorage() {
       return Array.from({ length: numSets }, () => ({ reps: defaultReps, weight: defaultWeight }));
     }
 
-    const completedSets = lastExercise.sets.filter(s => s.completed);
+    // Exclude warm-up sets from suggestions
+    const completedSets = lastExercise.sets.filter(s => s.completed && !s.isWarmup);
     if (completedSets.length === 0) {
       return Array.from({ length: numSets }, () => ({ reps: defaultReps, weight: defaultWeight }));
     }
 
-    // Calculate progression: if all sets completed, suggest small increase
-    const allCompleted = lastExercise.sets.every(s => s.completed);
+    // Calculate progression: if all non-warmup sets completed, suggest small increase
+    const allCompleted = lastExercise.sets.filter(s => !s.isWarmup).every(s => s.completed);
     const avgWeight = completedSets.reduce((sum, s) => sum + s.weight, 0) / completedSets.length;
     const avgReps = completedSets.reduce((sum, s) => sum + s.reps, 0) / completedSets.length;
 
@@ -358,12 +359,59 @@ export function useStorage() {
     setAppData(prev => {
       const user = prev.users[currentUser];
       if (!user) return prev;
+      const isCustom = (user.customExercises || []).some(e => e.id === exerciseId);
+      if (isCustom) {
+        // Remove fully — only affects this user's custom exercises
+        return {
+          ...prev,
+          users: {
+            ...prev.users,
+            [currentUser]: {
+              ...user,
+              customExercises: (user.customExercises || []).filter(e => e.id !== exerciseId),
+            },
+          },
+        };
+      } else {
+        // Default exercise: add to hidden list for this user only
+        const hidden = user.hiddenExerciseIds || [];
+        if (hidden.includes(exerciseId)) return prev; // already hidden
+        return {
+          ...prev,
+          users: {
+            ...prev.users,
+            [currentUser]: {
+              ...user,
+              hiddenExerciseIds: [...hidden, exerciseId],
+            },
+          },
+        };
+      }
+    });
+  }, [currentUser]);
+
+  const unhideExercise = useCallback((exerciseId: string) => {
+    if (!currentUser) return;
+    setAppData(prev => {
+      const user = prev.users[currentUser];
+      if (!user) return prev;
       return {
         ...prev,
-        users: { ...prev.users, [currentUser]: { ...user, customExercises: (user.customExercises || []).filter(e => e.id !== exerciseId) } },
+        users: {
+          ...prev.users,
+          [currentUser]: {
+            ...user,
+            hiddenExerciseIds: (user.hiddenExerciseIds || []).filter(id => id !== exerciseId),
+          },
+        },
       };
     });
   }, [currentUser]);
+
+  const getHiddenExerciseIds = useCallback((): string[] => {
+    const profile = getProfile();
+    return profile?.hiddenExerciseIds || [];
+  }, [getProfile]);
 
   // Cardio sessions management
   const getCardioSessions = useCallback((): CardioSession[] => {
@@ -626,6 +674,8 @@ export function useStorage() {
     saveExercise,
     updateExercise,
     deleteExercise,
+    unhideExercise,
+    getHiddenExerciseIds,
     getCardioSessions,
     saveCardioSession,
     deleteCardioSession,

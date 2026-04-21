@@ -11,12 +11,12 @@ const ExercisesContext = createContext<ExercisesContextType | null>(null);
 
 interface ExercisesProviderProps {
   customExercises: Exercise[];
+  hiddenExerciseIds?: string[];
   children: ReactNode;
 }
 
-export function ExercisesProvider({ customExercises, children }: ExercisesProviderProps) {
-  // Merge default exercises with custom ones
-  // Custom exercises override defaults with same ID
+export function ExercisesProvider({ customExercises, hiddenExerciseIds = [], children }: ExercisesProviderProps) {
+  // Start with default exercises, then override/add custom ones
   const allExercises: Exercise[] = [...EXERCISES];
   customExercises.forEach(custom => {
     const defaultIdx = allExercises.findIndex(e => e.id === custom.id);
@@ -27,12 +27,16 @@ export function ExercisesProvider({ customExercises, children }: ExercisesProvid
     }
   });
 
+  // Filter out exercises this user has hidden (only hides default ones — custom ones are deleted outright)
+  const visibleExercises = allExercises.filter(e => !hiddenExerciseIds.includes(e.id) || e.isCustom);
+
   const getExerciseById = (id: string): Exercise | undefined => {
+    // Always return even if hidden (needed for history display)
     return allExercises.find(e => e.id === id);
   };
 
   return (
-    <ExercisesContext.Provider value={{ allExercises, getExerciseById }}>
+    <ExercisesContext.Provider value={{ allExercises: visibleExercises, getExerciseById }}>
       {children}
     </ExercisesContext.Provider>
   );
@@ -41,7 +45,6 @@ export function ExercisesProvider({ customExercises, children }: ExercisesProvid
 export function useExercises() {
   const context = useContext(ExercisesContext);
   if (!context) {
-    // Return default exercises if no provider
     return {
       allExercises: EXERCISES,
       getExerciseById: (id: string) => EXERCISES.find(e => e.id === id),

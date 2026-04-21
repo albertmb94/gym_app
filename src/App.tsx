@@ -47,6 +47,7 @@ function AppInner() {
     saveExercise,
     updateExercise,
     deleteExercise,
+    getHiddenExerciseIds,
     getCardioSessions,
     saveCardioSession,
     deleteCardioSession,
@@ -80,6 +81,7 @@ function AppInner() {
   const physicalProfile = getPhysicalProfile();
   const customExercises = getCustomExercises();
   const allExercises = getAllExercises();
+  const hiddenExerciseIds = getHiddenExerciseIds();
   const cardioSessions = getCardioSessions();
 
   const handleStartSession = (session: WorkoutSession) => {
@@ -121,7 +123,7 @@ function AppInner() {
   const showSecondaryTabs = activeTab === 'profile' || activeTab === 'templates' || activeTab === 'exercises';
 
   return (
-    <ExercisesProvider customExercises={customExercises}>
+    <ExercisesProvider customExercises={customExercises} hiddenExerciseIds={hiddenExerciseIds}>
     <div className="h-screen bg-gray-900 max-w-lg mx-auto relative overflow-hidden">
       {/* Fixed Header */}
       <div className="fixed top-0 left-0 right-0 z-50 max-w-lg mx-auto">
@@ -202,6 +204,7 @@ function AppInner() {
                onStartSession={handleStartSession}
                onContinueWorkout={handleContinueSession}
                onEditSession={handleContinueSession}
+               onDeleteSession={deleteSession}
                getSuggestedSets={getSuggestedSets}
              />
            )}
