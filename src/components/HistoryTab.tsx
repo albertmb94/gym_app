@@ -1,19 +1,39 @@
-import { useState } from 'react';
-import { WorkoutSession } from '../types';
+import { useMemo, useState } from 'react';
+import { WorkoutSession, Exercise } from '../types';
 import { EXERCISES, MUSCLE_LABELS, WORKOUT_TYPE_LABELS, WORKOUT_TYPE_COLORS } from '../data/exercises';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronDown, ChevronUp, Trash2, Play, CheckCircle, Clock, Dumbbell } from 'lucide-react';
+import { ChevronDown, ChevronUp, Trash2, Play, CheckCircle, Clock, Dumbbell, CalendarDays } from 'lucide-react';
 
 interface Props {
   sessions: WorkoutSession[];
+  exercises: Exercise[];
   onDelete: (id: string) => void;
   onContinue: (session: WorkoutSession) => void;
+  onUpdate: (session: WorkoutSession) => void;
 }
 
-export default function HistoryTab({ sessions, onDelete, onContinue }: Props) {
+export default function HistoryTab({ sessions, exercises, onDelete, onContinue, onUpdate }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  // Look up exercises from the user's merged list (includes custom names/images),
+  // falling back to the built-in catalogue.
+  const exerciseMap = useMemo(() => {
+    const map = new Map<string, Exercise>();
+    EXERCISES.forEach(e => map.set(e.id, e));
+    exercises.forEach(e => map.set(e.id, e));
+    return map;
+  }, [exercises]);
+
+  // Move a workout to the correct calendar day (keeping its time-of-day).
+  const handleDateChange = (session: WorkoutSession, value: string) => {
+    if (!value) return;
+    const [y, m, d] = value.split('-').map(Number);
+    const next = new Date(session.date);
+    next.setFullYear(y, m - 1, d);
+    onUpdate({ ...session, date: next.toISOString() });
+  };
 
   const sorted = [...sessions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -91,7 +111,7 @@ export default function HistoryTab({ sessions, onDelete, onContinue }: Props) {
             {isExpanded && (
               <div className="border-t border-gray-700 p-4 space-y-3">
                 {session.exercises.map(exLog => {
-                  const ex = EXERCISES.find(e => e.id === exLog.exerciseId);
+                  const ex = exerciseMap.get(exLog.exerciseId);
                   if (!ex) return null;
                   const exVolume = exLog.sets.filter(s => s.completed).reduce((s, set) => s + set.reps * set.weight, 0);
                   return (
@@ -123,7 +143,19 @@ export default function HistoryTab({ sessions, onDelete, onContinue }: Props) {
                   );
                 })}
 
-                <div className="flex gap-2 mt-4">
+                <label className="flex items-center gap-2 mt-4 text-sm text-gray-400">
+                  <CalendarDays className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                  <span className="flex-shrink-0">Fecha del entreno</span>
+                  <input
+                    type="date"
+                    value={format(new Date(session.date), 'yyyy-MM-dd')}
+                    max={format(new Date(), 'yyyy-MM-dd')}
+                    onChange={e => handleDateChange(session, e.target.value)}
+                    className="ml-auto bg-gray-700 border border-gray-600 rounded-lg px-2 py-1 text-white text-xs focus:outline-none focus:border-orange-500"
+                  />
+                </label>
+
+                <div className="flex gap-2 mt-3">
                   {!session.completed && (
                     <button
                       onClick={() => onContinue(session)}

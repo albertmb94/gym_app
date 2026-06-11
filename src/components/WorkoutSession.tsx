@@ -8,17 +8,20 @@ import { es } from 'date-fns/locale';
 interface Props {
   session: WorkoutSessionType;
   profile: UserProfile | null;
+  username: string;
   onSave: (session: WorkoutSessionType) => void;
   onClose: () => void;
   getSuggestedSets: (exerciseId: string, numSets: number, defaultReps: number, defaultWeight: number) => { reps: number; weight: number }[];
   allExercises: any[];
 }
 
+const ACTIVE_SESSION_KEY = 'gymtracker_active_session';
+
 function generateId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-export default function WorkoutSession({ session: initialSession, profile, onSave, onClose, getSuggestedSets, allExercises }: Props) {
+export default function WorkoutSession({ session: initialSession, profile, username, onSave, onClose, getSuggestedSets, allExercises }: Props) {
   const [session, setSession] = useState<WorkoutSessionType>(initialSession);
   const [expandedExercise, setExpandedExercise] = useState<string | null>(
     initialSession.exercises[0]?.id || null
@@ -37,6 +40,17 @@ export default function WorkoutSession({ session: initialSession, profile, onSav
     }
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [timerRunning]);
+
+  // Pre-save: keep a live copy of the in-progress workout in localStorage so it
+  // survives the app being closed/killed in the background. App restores it on
+  // the next launch. Cleared by App when the workout is finished or closed.
+  useEffect(() => {
+    try {
+      localStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify({ username, session }));
+    } catch {
+      // Storage might be full or unavailable; ignore.
+    }
+  }, [session, username]);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
@@ -102,6 +116,18 @@ export default function WorkoutSession({ session: initialSession, profile, onSav
     setExerciseSearch('');
   };
 
+  // Allow logging a workout on a different day (e.g. a run you forgot to save
+  // at the time). Keeps the original time-of-day, only swaps the calendar date.
+  const handleDateChange = (value: string) => {
+    if (!value) return;
+    const [y, m, d] = value.split('-').map(Number);
+    setSession(prev => {
+      const next = new Date(prev.date);
+      next.setFullYear(y, m - 1, d);
+      return { ...prev, date: next.toISOString() };
+    });
+  };
+
   const handleFinish = () => {
     const durationMinutes = Math.max(1, Math.floor(timer / 60));
     // Calculate burned calories: MET method for strength is MET = 5
@@ -137,7 +163,16 @@ export default function WorkoutSession({ session: initialSession, profile, onSav
       <div className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between flex-shrink-0">
         <div>
           <h2 className="text-white font-bold text-lg">{session.name}</h2>
-          <p className="text-gray-400 text-sm">{format(new Date(session.date), "EEEE d MMM", { locale: es })}</p>
+          <label className="flex items-center gap-1.5 text-gray-400 text-sm cursor-pointer w-fit">
+            <span className="capitalize">{format(new Date(session.date), "EEEE d MMM", { locale: es })}</span>
+            <input
+              type="date"
+              value={format(new Date(session.date), 'yyyy-MM-dd')}
+              max={format(new Date(), 'yyyy-MM-dd')}
+              onChange={e => handleDateChange(e.target.value)}
+              className="bg-transparent text-orange-400 text-xs border border-gray-700 rounded px-1.5 py-0.5 focus:outline-none focus:border-orange-500"
+            />
+          </label>
         </div>
         <div className="flex items-center gap-3">
           {/* Timer */}

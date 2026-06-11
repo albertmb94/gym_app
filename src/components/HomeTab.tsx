@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { WorkoutSession, WorkoutTemplate, WeeklyPlan, ExerciseLog, SetLog } from '../types';
+import { useMemo, useState } from 'react';
+import { WorkoutSession, WorkoutTemplate, WeeklyPlan, ExerciseLog, SetLog, Exercise } from '../types';
 import { EXERCISES, WORKOUT_TYPE_LABELS, WORKOUT_TYPE_COLORS, DAYS_OF_WEEK, DEFAULT_TEMPLATES } from '../data/exercises';
 import { format, isSameDay, startOfWeek, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -10,6 +10,7 @@ interface Props {
   weeklyPlan: WeeklyPlan;
   templates: WorkoutTemplate[];
   username: string;
+  exercises: Exercise[];
   onStartSession: (session: WorkoutSession) => void;
   getSuggestedSets: (exerciseId: string, numSets: number, defaultReps: number, defaultWeight: number) => { reps: number; weight: number }[];
 }
@@ -43,8 +44,16 @@ function buildSessionFromTemplate(
   };
 }
 
-export default function HomeTab({ sessions, weeklyPlan, templates, username, onStartSession, getSuggestedSets }: Props) {
+export default function HomeTab({ sessions, weeklyPlan, templates, username, exercises, onStartSession, getSuggestedSets }: Props) {
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+
+  // Merged lookup so renamed / re-imaged exercises show their custom values.
+  const exerciseMap = useMemo(() => {
+    const map = new Map<string, Exercise>();
+    EXERCISES.forEach(e => map.set(e.id, e));
+    exercises.forEach(e => map.set(e.id, e));
+    return map;
+  }, [exercises]);
 
   const allTemplates = [...DEFAULT_TEMPLATES, ...templates.filter(t => !DEFAULT_TEMPLATES.some(d => d.id === t.id))];
 
@@ -200,7 +209,7 @@ export default function HomeTab({ sessions, weeklyPlan, templates, username, onS
             {/* Exercise preview */}
             <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
               {todayTemplate.exercises.map(ex => {
-                const exercise = EXERCISES.find(e => e.id === ex.exerciseId);
+                const exercise = exerciseMap.get(ex.exerciseId);
                 if (!exercise) return null;
                 return (
                   <div key={ex.exerciseId} className="flex-shrink-0 w-16">
@@ -344,7 +353,7 @@ export default function HomeTab({ sessions, weeklyPlan, templates, username, onS
             let csv = "Fecha,Entrenamiento,Ejercicio,Set,Peso(kg),Reps,Completado\n";
             sessions.forEach(s => {
               s.exercises.forEach(exLog => {
-                const exName = EXERCISES.find(e => e.id === exLog.exerciseId)?.name || exLog.exerciseId;
+                const exName = exerciseMap.get(exLog.exerciseId)?.name || exLog.exerciseId;
                 exLog.sets.forEach((set, i) => {
                   csv += `"${format(new Date(s.date), 'yyyy-MM-dd HH:mm')}",`;
                   csv += `"${s.name}","${exName}",${i + 1},${set.weight},${set.reps},${set.completed ? 'Si' : 'No'}\n`;

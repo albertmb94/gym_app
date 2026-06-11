@@ -14,6 +14,26 @@ import { Home, History, BarChart2, Calendar, Dumbbell, LogOut, Activity, UserCir
 
 type Tab = 'home' | 'cardio' | 'history' | 'stats' | 'templates' | 'exercises';
 
+// Key used to keep an in-progress workout safe if the app gets killed in the
+// background (e.g. phone closes the tab after a few minutes). See issue: the
+// active session is auto-persisted here and restored on the next launch.
+const ACTIVE_SESSION_KEY = 'gymtracker_active_session';
+
+function loadActiveSession(): WorkoutSession | null {
+  try {
+    const raw = localStorage.getItem(ACTIVE_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const currentUser = localStorage.getItem('gymtracker_current_user');
+    if (parsed && parsed.session && parsed.username && parsed.username === currentUser) {
+      return parsed.session as WorkoutSession;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
   const {
     currentUser,
@@ -38,7 +58,8 @@ export default function App() {
   } = useStorage();
 
   const [activeTab, setActiveTab] = useState<Tab>('home');
-  const [activeSession, setActiveSession] = useState<WorkoutSession | null>(null);
+  // Restore any workout that was in progress when the app was last closed.
+  const [activeSession, setActiveSession] = useState<WorkoutSession | null>(loadActiveSession);
   const [showProfile, setShowProfile] = useState(false);
 
   // Get all stored usernames for quick login
@@ -67,11 +88,19 @@ export default function App() {
 
   const handleCloseSession = () => {
     setActiveSession(null);
+    // The workout is no longer in progress; drop the safety copy.
+    localStorage.removeItem(ACTIVE_SESSION_KEY);
   };
 
   const handleContinueSession = (session: WorkoutSession) => {
     setActiveSession(session);
     setActiveTab('home');
+  };
+
+  const handleLogout = () => {
+    // Don't carry an in-memory workout over to the next account that logs in.
+    setActiveSession(null);
+    logout();
   };
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -102,7 +131,7 @@ export default function App() {
             <span className="text-xs font-semibold">{currentUser}</span>
           </button>
           <button
-            onClick={logout}
+            onClick={handleLogout}
             className="p-1.5 text-gray-500 hover:text-red-400 transition-colors"
             title="Cerrar sesión"
           >
@@ -120,6 +149,7 @@ export default function App() {
               weeklyPlan={weeklyPlan}
               templates={allTemplates}
               username={currentUser}
+              exercises={exercises}
               onStartSession={handleStartSession}
               getSuggestedSets={getSuggestedSets}
             />
@@ -135,8 +165,10 @@ export default function App() {
           {activeTab === 'history' && (
             <HistoryTab
               sessions={sessions}
+              exercises={exercises}
               onDelete={deleteSession}
               onContinue={handleContinueSession}
+              onUpdate={saveSession}
             />
           )}
           {activeTab === 'stats' && (
@@ -188,6 +220,7 @@ export default function App() {
         <WorkoutSessionView
           session={activeSession}
           profile={profile}
+          username={currentUser}
           onSave={handleSaveSession}
           onClose={handleCloseSession}
           getSuggestedSets={getSuggestedSets}
