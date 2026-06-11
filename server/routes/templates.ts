@@ -44,6 +44,47 @@ router.post('/:userId', (req, res) => {
   });
 });
 
+// Get weekly plan
+// NOTE: must be registered before the generic "/:userId/:templateId" routes,
+// otherwise Express matches "weekly-plan" as a :templateId and this never runs.
+router.get('/:userId/weekly-plan', (req, res) => {
+  const { userId } = req.params;
+
+  const plan = db.prepare(`
+    SELECT day_of_week as dayOfWeek, template_id as templateId
+    FROM weekly_plan
+    WHERE user_id = ?
+    ORDER BY day_of_week
+  `).all(userId);
+
+  res.json({ plan });
+});
+
+// Update weekly plan
+router.put('/:userId/weekly-plan', (req, res) => {
+  const { userId } = req.params;
+  const { plan } = req.body; // Array of { dayOfWeek, templateId }
+
+  const transaction = db.transaction(() => {
+    // Clear existing plan
+    db.prepare('DELETE FROM weekly_plan WHERE user_id = ?').run(userId);
+
+    // Insert new plan
+    for (const day of plan) {
+      if (day.templateId) {
+        db.prepare(`
+          INSERT INTO weekly_plan (id, user_id, day_of_week, template_id)
+          VALUES (?, ?, ?, ?)
+        `).run(uuidv4(), userId, day.dayOfWeek, day.templateId);
+      }
+    }
+  });
+
+  transaction();
+
+  res.json({ success: true });
+});
+
 // Update a template
 router.put('/:userId/:templateId', (req, res) => {
   const { userId, templateId } = req.params;
@@ -75,45 +116,6 @@ router.delete('/:userId/:templateId', (req, res) => {
   }
   
   db.prepare('DELETE FROM workout_templates WHERE id = ?').run(templateId);
-  
-  res.json({ success: true });
-});
-
-// Get weekly plan
-router.get('/:userId/weekly-plan', (req, res) => {
-  const { userId } = req.params;
-  
-  const plan = db.prepare(`
-    SELECT day_of_week as dayOfWeek, template_id as templateId 
-    FROM weekly_plan 
-    WHERE user_id = ?
-    ORDER BY day_of_week
-  `).all(userId);
-  
-  res.json({ plan });
-});
-
-// Update weekly plan
-router.put('/:userId/weekly-plan', (req, res) => {
-  const { userId } = req.params;
-  const { plan } = req.body; // Array of { dayOfWeek, templateId }
-  
-  const transaction = db.transaction(() => {
-    // Clear existing plan
-    db.prepare('DELETE FROM weekly_plan WHERE user_id = ?').run(userId);
-    
-    // Insert new plan
-    for (const day of plan) {
-      if (day.templateId) {
-        db.prepare(`
-          INSERT INTO weekly_plan (id, user_id, day_of_week, template_id)
-          VALUES (?, ?, ?, ?)
-        `).run(uuidv4(), userId, day.dayOfWeek, day.templateId);
-      }
-    }
-  });
-  
-  transaction();
   
   res.json({ success: true });
 });

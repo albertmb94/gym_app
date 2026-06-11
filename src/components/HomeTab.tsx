@@ -77,15 +77,20 @@ export default function HomeTab({ sessions, weeklyPlan, templates, username, onS
     sum + s.exercises.reduce((s2, ex) => s2 + ex.sets.filter(s => s.completed).reduce((s3, set) => s3 + set.reps * set.weight, 0), 0), 0
   );
 
-  // Streak
+  // Streak: count consecutive distinct days with a completed session.
+  // Normalize to day granularity so multiple sessions on the same day count once
+  // and the time-of-day doesn't distort the day difference.
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const MS_PER_DAY = 1000 * 60 * 60 * 24;
   let streak = 0;
-  const sortedCompleted = [...sessions].filter(s => s.completed).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  if (sortedCompleted.length > 0) {
-    let checkDate = today;
-    for (const s of sortedCompleted) {
-      const sDate = new Date(s.date);
-      const diffDays = Math.floor((checkDate.getTime() - sDate.getTime()) / (1000 * 60 * 60 * 24));
-      if (diffDays <= 1) { streak++; checkDate = sDate; } else break;
+  const completedDays = [...new Set(
+    sessions.filter(s => s.completed).map(s => startOfDay(new Date(s.date)))
+  )].sort((a, b) => b - a);
+  if (completedDays.length > 0) {
+    let checkDay = startOfDay(today);
+    for (const day of completedDays) {
+      const diffDays = Math.round((checkDay - day) / MS_PER_DAY);
+      if (diffDays <= 1) { streak++; checkDay = day; } else break;
     }
   }
 
