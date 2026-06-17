@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { createClient, Client } from '@libsql/client';
+import crypto from 'crypto';
 
 // ============================================================================
 // DATABASE (Turso / LibSQL) — simple key-value store per user
@@ -28,17 +29,62 @@ async function initDb() {
     CREATE TABLE IF NOT EXISTS user_data (
       username TEXT PRIMARY KEY,
       data TEXT NOT NULL,
-      updated_at INTEGER NOT NULL
+      updated_at INTEGER NOT NULL,
+      auth_token_hash TEXT
     )
   `);
+  // Backfill existing rows so the column exists with a NULL token hash.
+  try {
+    await getDb().execute(`ALTER TABLE user_data ADD COLUMN auth_token_hash TEXT`);
+  } catch {
+    // Column already exists; ignore.
+  }
   initialized = true;
+}
+
+function hashToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+function getAuthToken(req: Request): string | null {
+  const header = req.headers.authorization || '';
+  const [scheme, token] = header.split(' ');
+  if (scheme?.toLowerCase() === 'bearer' && token) return token;
+  return null;
+}
+
+async function verifyToken(
+  username: string,
+  token: string | null
+): Promise<{ ok: boolean; row?: any }> {
+  const result = await getDb().execute({
+    sql: 'SELECT data, updated_at, auth_token_hash FROM user_data WHERE username = ?',
+    args: [username],
+  });
+  const row = result.rows[0] as any;
+  if (!row) return { ok: true };
+  if (!row.auth_token_hash) return { ok: true, row };
+  if (!token) return { ok: false };
+  const providedHash = hashToken(token);
+  return { ok: providedHash === row.auth_token_hash, row };
 }
 
 // ============================================================================
 // EXPRESS APP
 // ============================================================================
 const app = express();
-app.use(cors());
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      const allowed = process.env.ALLOWED_ORIGIN;
+      if (!allowed || !origin || origin === allowed) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+  })
+);
 app.use(express.json({ limit: '20mb' }));
 
 app.use(async (_req, _res, next) => {
@@ -60,11 +106,10 @@ app.get('/api/data/:username', async (req: Request, res: Response) => {
   const username = (req.params.username || '').trim().toLowerCase();
   if (!username) return res.status(400).json({ error: 'Username required' });
 
-  const result = await getDb().execute({
-    sql: 'SELECT data, updated_at FROM user_data WHERE username = ?',
-    args: [username],
-  });
-  const row = result.rows[0] as any;
+  const token = getAuthToken(req);
+  const { ok, row } = await verifyToken(username, token);
+  if (!ok) return res.status(401).json({ error: 'Unauthorized' });
+
   if (!row) {
     return res.json({ data: null, updatedAt: 0 });
   }
@@ -80,6 +125,10 @@ app.put('/api/data/:username', async (req: Request, res: Response) => {
   const username = (req.params.username || '').trim().toLowerCase();
   if (!username) return res.status(400).json({ error: 'Username required' });
 
+  const token = getAuthToken(req);
+  const { ok, row } = await verifyToken(username, token);
+  if (!ok) return res.status(401).json({ error: 'Unauthorized' });
+
   const data = req.body?.data;
   if (data === undefined || data === null) {
     return res.status(400).json({ error: 'Body must contain "data" field' });
@@ -87,21 +136,14 @@ app.put('/api/data/:username', async (req: Request, res: Response) => {
 
   const now = Date.now();
   const json = JSON.stringify(data);
+  const tokenHash = token ? hashToken(token) : (row?.auth_token_hash || null);
   await getDb().execute({
-    sql: `INSERT INTO user_data (username, data, updated_at)
-          VALUES (?, ?, ?)
-          ON CONFLICT(username) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at`,
-    args: [username, json, now],
+    sql: `INSERT INTO user_data (username, data, updated_at, auth_token_hash)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(username) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at, auth_token_hash=excluded.auth_token_hash`,
+    args: [username, json, now, tokenHash],
   });
   res.json({ ok: true, updatedAt: now });
-});
-
-// List all usernames (useful to populate quick-login)
-app.get('/api/users', async (_req, res) => {
-  const result = await getDb().execute('SELECT username, updated_at FROM user_data ORDER BY username');
-  res.json({
-    users: result.rows.map((r: any) => ({ username: r.username, updatedAt: Number(r.updated_at) })),
-  });
 });
 
 // Error handler

@@ -4,7 +4,7 @@ import { WORKOUT_TYPE_COLORS, WORKOUT_TYPE_LABELS } from '../data/exercises';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-  eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, isToday,
+  eachDayOfInterval, isSameMonth, addMonths, subMonths, isToday,
 } from 'date-fns';
 import { es, enUS } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Activity } from 'lucide-react';

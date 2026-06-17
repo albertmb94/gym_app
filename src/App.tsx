@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useState, Suspense, lazy } from 'react';
 import { useStorage } from './hooks/useStorage';
 import { ExercisesProvider } from './contexts/ExercisesContext';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import LoginScreen from './components/LoginScreen';
 import HomeTab from './components/HomeTab';
 import HistoryTab from './components/HistoryTab';
-import StatsTab from './components/StatsTab';
 import TemplatesTab from './components/TemplatesTab';
 import ExercisesTab from './components/ExercisesTab';
 import ProfileTab from './components/ProfileTab';
-import CardioTab from './components/CardioTab';
+
+const StatsTab = lazy(() => import('./components/StatsTab'));
+const CardioTab = lazy(() => import('./components/CardioTab'));
 import WorkoutSessionView from './components/WorkoutSession';
 import { WorkoutSession } from './types';
 import { Home, History, BarChart2, Calendar, Dumbbell, User, Activity, LogOut } from 'lucide-react';
@@ -67,10 +68,17 @@ function AppInner() {
 
   // Get all stored usernames for quick login
   const storedData = localStorage.getItem('gymtracker_data');
-  const allUsers = storedData ? Object.keys(JSON.parse(storedData).users || {}) : [];
+  let allUsers: string[] = [];
+  if (storedData) {
+    try {
+      allUsers = Object.keys(JSON.parse(storedData).users || {});
+    } catch {
+      allUsers = [];
+    }
+  }
 
   if (!currentUser) {
-    return <LoginScreen onLogin={login} existingUsers={allUsers} />;
+    return <LoginScreen onLogin={(username, token) => login(username, token)} existingUsers={allUsers} />;
   }
 
   const profile = getProfile();
@@ -218,19 +226,23 @@ function AppInner() {
             />
           )}
           {activeTab === 'cardio' && (
-            <CardioTab
-              cardioSessions={cardioSessions}
-              physicalProfile={physicalProfile}
-              onSaveSession={saveCardioSession}
-              onDeleteSession={deleteCardioSession}
-              estimateCalories={estimateCardioCalories}
-            />
+            <Suspense fallback={<div className="p-8 text-center text-gray-400">Cargando cardio…</div>}>
+              <CardioTab
+                cardioSessions={cardioSessions}
+                physicalProfile={physicalProfile}
+                onSaveSession={saveCardioSession}
+                onDeleteSession={deleteCardioSession}
+                estimateCalories={estimateCardioCalories}
+              />
+            </Suspense>
           )}
           {activeTab === 'stats' && (
-            <StatsTab 
-              sessions={sessions} 
-              cardioSessions={cardioSessions}
-            />
+            <Suspense fallback={<div className="p-8 text-center text-gray-400">Cargando estadísticas…</div>}>
+              <StatsTab
+                sessions={sessions}
+                cardioSessions={cardioSessions}
+              />
+            </Suspense>
           )}
           {activeTab === 'templates' && (
             <TemplatesTab

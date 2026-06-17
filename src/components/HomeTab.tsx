@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { WorkoutSession, WorkoutTemplate, WeeklyPlan, ExerciseLog, SetLog } from '../types';
 import { EXERCISES, WORKOUT_TYPE_COLORS, DEFAULT_TEMPLATES } from '../data/exercises';
 import { useLanguage } from '../contexts/LanguageContext';
+import { generateId } from '../lib/id';
 import { format, isSameDay, startOfWeek, addDays } from 'date-fns';
 import { es, enUS } from 'date-fns/locale';
 import { Play, Plus, Calendar, TrendingUp, Dumbbell, ChevronRight, Flame, AlertTriangle } from 'lucide-react';
@@ -16,10 +17,6 @@ interface Props {
   onEditSession: (session: WorkoutSession) => void;
   onDeleteSession: (id: string) => void;
   getSuggestedSets: (exerciseId: string, numSets: number, defaultReps: number, defaultWeight: number) => { reps: number; weight: number }[];
-}
-
-function generateId() {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
 function buildSessionFromTemplate(

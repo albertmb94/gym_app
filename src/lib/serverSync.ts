@@ -24,55 +24,72 @@ export async function isServerAvailable(): Promise<boolean> {
   return checkServer();
 }
 
-export async function listServerUsers(): Promise<string[]> {
-  if (!(await checkServer())) return [];
-  try {
-    const r = await fetch('/api/users');
-    if (!r.ok) return [];
-    const j = await r.json();
-    return (j.users || []).map((u: any) => u.username as string);
-  } catch {
-    return [];
-  }
-}
-
 // Fetch a user's full data blob from the server. Returns null if not present.
-export async function fetchUserData(username: string): Promise<{ users: AppData['users']; sessions: AppData['sessions']; cardioSessions?: AppData['cardioSessions'] } | null> {
+// Includes the server's `updatedAt` timestamp so the caller can resolve conflicts.
+export async function fetchUserData(
+  username: string,
+  getToken: () => string | null = () => null
+): Promise<{ data: { users: AppData['users']; sessions: AppData['sessions']; cardioSessions?: AppData['cardioSessions'] }; updatedAt: number } | null> {
   if (!(await checkServer())) return null;
   try {
-    const r = await fetch(`/api/data/${encodeURIComponent(username)}`);
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const r = await fetch(`/api/data/${encodeURIComponent(username)}`, { headers });
     if (!r.ok) return null;
     const j = await r.json();
-    return j.data || null;
+    if (!j.data) return null;
+    return { data: j.data, updatedAt: Number(j.updatedAt || 0) };
   } catch {
     return null;
   }
 }
 
 // Pushes only the slice of AppData that belongs to `username`.
-// This is debounced via the caller.
-export async function pushUserData(username: string, appData: AppData): Promise<boolean> {
-  if (!(await checkServer())) return false;
+// This is debounced via the caller. Returns the server timestamp on success.
+export async function pushUserData(
+  username: string,
+  appData: AppData,
+  getToken: () => string | null = () => null
+): Promise<{ ok: boolean; updatedAt?: number }> {
+  if (!(await checkServer())) return { ok: false };
   const slice = {
     users: { [username]: appData.users[username] },
     sessions: { [username]: appData.sessions[username] || [] },
     cardioSessions: { [username]: (appData.cardioSessions || {})[username] || [] },
   };
   try {
+    const token = getToken();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
     const r = await fetch(`/api/data/${encodeURIComponent(username)}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ data: slice }),
     });
-    return r.ok;
+    if (!r.ok) return { ok: false };
+    const j = await r.json().catch(() => ({}));
+    return { ok: true, updatedAt: Number(j.updatedAt || Date.now()) };
   } catch {
-    return false;
+    return { ok: false };
   }
 }
 
-// Merge a server slice into the current AppData. Server slice wins for that user.
-export function mergeServerData(local: AppData, username: string, remote: any): AppData {
-  if (!remote) return local;
+// Merge a server slice into the current AppData respecting last-write-wins.
+// Remote data is applied only when it is newer than `lastSyncedAt`. Local wins
+// when it is newer; the caller's push path will upload it later.
+export function mergeServerData(
+  local: AppData,
+  username: string,
+  remote: any,
+  lastSyncedAt: number
+): { merged: AppData; appliedRemote: boolean } {
+  if (!remote) return { merged: local, appliedRemote: false };
+
+  if (!remote.updatedAt || remote.updatedAt <= lastSyncedAt) {
+    return { merged: local, appliedRemote: false };
+  }
+
   const merged: AppData = {
     users: { ...local.users },
     sessions: { ...local.sessions },
@@ -88,5 +105,5 @@ export function mergeServerData(local: AppData, username: string, remote: any): 
     merged.cardioSessions = merged.cardioSessions || {};
     merged.cardioSessions[username] = remote.cardioSessions[username];
   }
-  return merged;
+  return { merged, appliedRemote: true };
 }

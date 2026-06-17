@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { WorkoutTemplate, TemplateExercise, WeeklyPlan, WorkoutType, Exercise } from '../types';
 import { MUSCLE_LABELS, WORKOUT_TYPE_LABELS, WORKOUT_TYPE_COLORS, DAYS_OF_WEEK, DEFAULT_TEMPLATES } from '../data/exercises';
+import { generateId } from '../lib/id';
 import { Plus, Trash2, Edit3, Save, X, ChevronDown, ChevronUp, Calendar, Dumbbell, RefreshCw, Search } from 'lucide-react';
 import NumericInput from './NumericInput';
 
@@ -12,10 +13,6 @@ interface Props {
   onUpdateWeeklyPlan: (plan: WeeklyPlan) => void;
   getSuggestedSets: (exerciseId: string, numSets: number, defaultReps: number, defaultWeight: number) => { reps: number; weight: number }[];
   allExercises: Exercise[]; // NEW: receive all exercises including custom
-}
-
-function generateId() {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
 const WORKOUT_TYPES: WorkoutType[] = ['push', 'pull', 'legs', 'upper', 'lower', 'full', 'custom'];

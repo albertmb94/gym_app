@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { WorkoutSession as WorkoutSessionType, ExerciseLog, SetLog, Exercise, MuscleGroup } from '../types';
 import { useExercises } from '../contexts/ExercisesContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { generateId } from '../lib/id';
 import { Plus, Trash2, Check, ChevronDown, ChevronUp, Timer, Save, X, Search, GripVertical, Flame, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { es, enUS } from 'date-fns/locale';
@@ -13,10 +14,6 @@ interface Props {
   onClose: () => void;
   onDelete?: (sessionId: string) => void;
   getSuggestedSets: (exerciseId: string, numSets: number, defaultReps: number, defaultWeight: number) => { reps: number; weight: number }[];
-}
-
-function generateId() {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
 export default function WorkoutSession({ session: initialSession, onSave, onClose, onDelete, getSuggestedSets }: Props) {

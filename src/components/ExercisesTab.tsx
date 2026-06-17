@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Exercise, MuscleGroup, WorkoutType } from '../types';
 import { EXERCISES, MUSCLE_LABELS, WORKOUT_TYPE_LABELS, WORKOUT_TYPE_COLORS, ALL_MUSCLES } from '../data/exercises';
+import { generateId } from '../lib/id';
 import { Search, X, ChevronDown, ChevronUp, Edit2, Plus, Trash2, Save, Check } from 'lucide-react';
 
 const WORKOUT_TYPES: WorkoutType[] = ['push', 'pull', 'legs', 'upper', 'lower', 'full'];
@@ -95,7 +96,7 @@ export default function ExercisesTab({
   const saveNewExercise = () => {
     if (!editName.trim()) return;
     const newExercise: Exercise = {
-      id: `custom-${Date.now()}`,
+      id: `custom-${generateId()}`,
       name: editName,
       description: editDescription || 'Ejercicio personalizado',
       primaryMuscles: editPrimaryMuscles,

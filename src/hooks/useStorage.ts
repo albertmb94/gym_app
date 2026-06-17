@@ -2,14 +2,83 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { AppData, UserProfile, WorkoutSession, WorkoutTemplate, WeeklyPlan, PhysicalProfile, Exercise, CardioSession } from '../types';
 import { DEFAULT_TEMPLATES, EXERCISES } from '../data/exercises';
 import { fetchUserData, pushUserData, mergeServerData, isServerAvailable } from '../lib/serverSync';
+import { generateId } from '../lib/id';
 
 const STORAGE_KEY = 'gymtracker_data';
+const LAST_SYNCED_KEY = 'gymtracker_last_synced';
+const TOKENS_KEY = 'gymtracker_tokens';
 
 const defaultAppData: AppData = {
   users: {},
   sessions: {},
   cardioSessions: {},
 };
+
+function getLastSyncedAt(username: string): number {
+  try {
+    const raw = localStorage.getItem(LAST_SYNCED_KEY);
+    if (!raw) return 0;
+    const map = JSON.parse(raw) as Record<string, number>;
+    return map[username] || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function setLastSyncedAt(username: string, ts: number) {
+  try {
+    const raw = localStorage.getItem(LAST_SYNCED_KEY) || '{}';
+    const map = JSON.parse(raw) as Record<string, number>;
+    map[username] = ts;
+    localStorage.setItem(LAST_SYNCED_KEY, JSON.stringify(map));
+  } catch {
+    // ignore
+  }
+}
+
+function clearLastSyncedAt(username: string) {
+  try {
+    const raw = localStorage.getItem(LAST_SYNCED_KEY) || '{}';
+    const map = JSON.parse(raw) as Record<string, number>;
+    delete map[username];
+    localStorage.setItem(LAST_SYNCED_KEY, JSON.stringify(map));
+  } catch {
+    // ignore
+  }
+}
+
+function getUserToken(username: string): string | null {
+  try {
+    const raw = localStorage.getItem(TOKENS_KEY);
+    if (!raw) return null;
+    const map = JSON.parse(raw) as Record<string, string>;
+    return map[username] || null;
+  } catch {
+    return null;
+  }
+}
+
+function setUserToken(username: string, token: string) {
+  try {
+    const raw = localStorage.getItem(TOKENS_KEY) || '{}';
+    const map = JSON.parse(raw) as Record<string, string>;
+    map[username] = token;
+    localStorage.setItem(TOKENS_KEY, JSON.stringify(map));
+  } catch {
+    // ignore
+  }
+}
+
+function clearUserToken(username: string) {
+  try {
+    const raw = localStorage.getItem(TOKENS_KEY) || '{}';
+    const map = JSON.parse(raw) as Record<string, string>;
+    delete map[username];
+    localStorage.setItem(TOKENS_KEY, JSON.stringify(map));
+  } catch {
+    // ignore
+  }
+}
 
 function loadData(): AppData {
   try {
@@ -48,7 +117,7 @@ export function useStorage() {
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error' | 'offline'>('idle');
   const pushTimer = useRef<number | null>(null);
   const lastPushed = useRef<string>('');
-  const initialPullDone = useRef<Set<string>>(new Set());
+  const pullCompleted = useRef<Set<string>>(new Set());
 
   // Detect server availability once
   useEffect(() => {
@@ -58,13 +127,23 @@ export function useStorage() {
   // On user change: pull latest from server (server is source of truth if newer)
   useEffect(() => {
     if (!currentUser || !serverOn) return;
-    if (initialPullDone.current.has(currentUser)) return;
-    initialPullDone.current.add(currentUser);
+    if (pullCompleted.current.has(currentUser)) return;
+    pullCompleted.current.add(currentUser);
     setSyncStatus('syncing');
-    fetchUserData(currentUser).then(remote => {
-      if (remote) {
+    fetchUserData(currentUser, () => getUserToken(currentUser)).then(remote => {
+      pullCompleted.current.add(currentUser);
+      if (remote?.data) {
         setAppData(prev => {
-          const merged = mergeServerData(prev, currentUser, remote);
+          const lastSyncedAt = getLastSyncedAt(currentUser);
+          const { merged, appliedRemote } = mergeServerData(
+            prev,
+            currentUser,
+            { ...remote.data, updatedAt: remote.updatedAt },
+            lastSyncedAt
+          );
+          if (appliedRemote) {
+            setLastSyncedAt(currentUser, remote.updatedAt);
+          }
           lastPushed.current = JSON.stringify({
             users: { [currentUser]: merged.users[currentUser] },
             sessions: { [currentUser]: merged.sessions[currentUser] || [] },
@@ -74,12 +153,16 @@ export function useStorage() {
         });
       }
       setSyncStatus('synced');
-    }).catch(() => setSyncStatus('error'));
+    }).catch(() => {
+      pullCompleted.current.add(currentUser);
+      setSyncStatus('error');
+    });
   }, [currentUser, serverOn]);
 
   // Debounced push to server on any change
   useEffect(() => {
     if (!currentUser || !serverOn) return;
+    if (!pullCompleted.current.has(currentUser)) return;
     const slice = JSON.stringify({
       users: { [currentUser]: appData.users[currentUser] },
       sessions: { [currentUser]: appData.sessions[currentUser] || [] },
@@ -89,9 +172,12 @@ export function useStorage() {
     if (pushTimer.current) window.clearTimeout(pushTimer.current);
     setSyncStatus('syncing');
     pushTimer.current = window.setTimeout(async () => {
-      const ok = await pushUserData(currentUser, appData);
-      if (ok) {
+      const result = await pushUserData(currentUser, appData, () => getUserToken(currentUser));
+      if (result.ok) {
         lastPushed.current = slice;
+        if (result.updatedAt) {
+          setLastSyncedAt(currentUser, result.updatedAt);
+        }
         setSyncStatus('synced');
       } else {
         setSyncStatus('error');
@@ -102,9 +188,12 @@ export function useStorage() {
     };
   }, [appData, currentUser, serverOn]);
 
-  const login = useCallback((username: string) => {
+  const login = useCallback((username: string, token?: string) => {
     const trimmed = username.trim();
     if (!trimmed) return false;
+    if (token) {
+      setUserToken(trimmed, token);
+    }
     setAppData(prev => {
       if (!prev.users[trimmed]) {
         const newUser: UserProfile = {
@@ -131,8 +220,14 @@ export function useStorage() {
   }, []);
 
   const logout = useCallback(() => {
+    if (currentUser) {
+      pullCompleted.current.delete(currentUser);
+      clearLastSyncedAt(currentUser);
+      clearUserToken(currentUser);
+      lastPushed.current = '';
+    }
     setCurrentUser(null);
-  }, []);
+  }, [currentUser]);
 
   const getProfile = useCallback((): UserProfile | null => {
     if (!currentUser) return null;
@@ -248,9 +343,11 @@ export function useStorage() {
     const avgWeight = completedSets.reduce((sum, s) => sum + s.weight, 0) / completedSets.length;
     const avgReps = completedSets.reduce((sum, s) => sum + s.reps, 0) / completedSets.length;
 
-    // Progressive overload: if all sets completed last time, add 2.5kg
-    const suggestedWeight = allCompleted ? Math.round((avgWeight + 2.5) * 2) / 2 : avgWeight;
-    const suggestedReps = Math.round(avgReps);
+    // Progressive overload: if all sets completed last time, add 2.5kg.
+    // Bodyweight exercises (avgWeight === 0) keep weight at 0 and suggest +1 rep.
+    const isBodyweight = avgWeight === 0;
+    const suggestedWeight = allCompleted && !isBodyweight ? Math.round((avgWeight + 2.5) * 2) / 2 : avgWeight;
+    const suggestedReps = allCompleted && isBodyweight ? Math.round(avgReps) + 1 : Math.round(avgReps);
 
     return Array.from({ length: numSets }, (_, i) => {
       if (i < completedSets.length) {
@@ -311,7 +408,7 @@ export function useStorage() {
       const defaultExercise = EXERCISES.find(e => e.id === exercise.id);
       if (defaultExercise) {
         // Add as custom override
-        const customExercise = { ...exercise, isCustom: true, id: `custom-${exercise.id}-${Date.now()}` };
+        const customExercise = { ...exercise, isCustom: true, id: `custom-${exercise.id}-${generateId()}` };
         return {
           ...prev,
           users: { ...prev.users, [currentUser]: { ...user, customExercises: [...existing, customExercise] } },
@@ -519,21 +616,23 @@ export function useStorage() {
     // Using the formula that accounts for heart rate
     if (avgHeartRate > 0 && maxHeartRate > 0) {
       const hrReserve = maxHeartRate - restingHeartRate;
-      const intensity = (avgHeartRate - restingHeartRate) / hrReserve;
-      
-      // Adjust MET based on heart rate intensity
-      const adjustedMET = baseMET * (0.5 + intensity);
-      
-      let calories: number;
-      if (sex === 'male') {
-        calories = ((-55.0969 + (0.6309 * avgHeartRate) + (0.1988 * weight) + (0.2017 * age)) / 4.184) * durationMinutes;
-      } else {
-        calories = ((-20.4022 + (0.4472 * avgHeartRate) - (0.1263 * weight) + (0.074 * age)) / 4.184) * durationMinutes;
+      if (hrReserve > 0) {
+        const intensity = Math.max(0, Math.min(1, (avgHeartRate - restingHeartRate) / hrReserve));
+        
+        // Adjust MET based on heart rate intensity
+        const adjustedMET = baseMET * (0.5 + intensity);
+        
+        let calories: number;
+        if (sex === 'male') {
+          calories = ((-55.0969 + (0.6309 * avgHeartRate) + (0.1988 * weight) + (0.2017 * age)) / 4.184) * durationMinutes;
+        } else {
+          calories = ((-20.4022 + (0.4472 * avgHeartRate) - (0.1263 * weight) + (0.074 * age)) / 4.184) * durationMinutes;
+        }
+        
+        // Use the higher of heart rate formula or MET-based calculation
+        const metCalories = adjustedMET * weight * (durationMinutes / 60);
+        return Math.round(Math.max(calories, metCalories));
       }
-      
-      // Use the higher of heart rate formula or MET-based calculation
-      const metCalories = adjustedMET * weight * (durationMinutes / 60);
-      return Math.round(Math.max(calories, metCalories));
     }
     
     // MET-based calculation
@@ -635,12 +734,24 @@ export function useStorage() {
         const existingExerciseIds = new Set((user.customExercises || []).map(e => e.id));
         const newExercises = (importData.customExercises || []).filter((e: Exercise) => !existingExerciseIds.has(e.id));
         
+        // Merge custom templates by id (same policy as sessions/exercises).
+        const existingTemplateIds = new Set((user.customTemplates || []).map(t => t.id));
+        const newTemplates = (importData.profile?.customTemplates || []).filter(
+          (t: WorkoutTemplate) => !existingTemplateIds.has(t.id)
+        );
+        const mergedTemplates = [...(user.customTemplates || []), ...newTemplates];
+        
+        // Profile/weekly plan: only take imported value when local is missing,
+        // so an existing user does not lose their current configuration.
+        const importedProfile = importData.profile;
+        const hasWeeklyPlan = user.weeklyPlan && user.weeklyPlan.days && user.weeklyPlan.days.length > 0;
+        
         const updatedUser = {
           ...user,
-          physicalProfile: importData.profile?.physicalProfile || user.physicalProfile,
+          physicalProfile: user.physicalProfile || importedProfile?.physicalProfile,
           customExercises: [...(user.customExercises || []), ...newExercises],
-          customTemplates: importData.profile?.customTemplates || user.customTemplates,
-          weeklyPlan: importData.profile?.weeklyPlan || user.weeklyPlan,
+          customTemplates: mergedTemplates,
+          weeklyPlan: hasWeeklyPlan ? user.weeklyPlan : (importedProfile?.weeklyPlan || user.weeklyPlan),
         };
         
         return {

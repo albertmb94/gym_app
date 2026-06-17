@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { CardioSession, PhysicalProfile, GpxRoute } from '../types';
 import { CARDIO_TYPES } from '../data/exercises';
 import { parseGpx } from '../lib/gpx';
+import { generateId } from '../lib/id';
 import MapRoute from './MapRoute';
 import {
   Activity, Clock, Heart, Flame, Plus, Trash2, X, Check, Calendar,
@@ -54,7 +55,7 @@ export default function CardioTab({
   const handleSave = () => {
     const calories = estimateCalories(selectedCardio, duration, avgHeartRate);
     const session: CardioSession = {
-      id: `cardio-${Date.now()}`,
+      id: `cardio-${generateId()}`,
       date: new Date(sessionDate).toISOString(),
       cardioTypeId: selectedCardio,
       duration,

@@ -1,14 +1,17 @@
-import { useState } from 'react';
-import { Dumbbell, User, LogIn } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Dumbbell, User, LogIn, KeyRound } from 'lucide-react';
 
 interface Props {
-  onLogin: (username: string) => void;
+  onLogin: (username: string, token: string) => void;
   existingUsers: string[];
 }
 
 export default function LoginScreen({ onLogin, existingUsers }: Props) {
   const [username, setUsername] = useState('');
+  const [token, setToken] = useState('');
+  const [showToken, setShowToken] = useState(false);
   const [error, setError] = useState('');
+  const tokenInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -16,7 +19,7 @@ export default function LoginScreen({ onLogin, existingUsers }: Props) {
       setError('Por favor, introduce un nombre de usuario.');
       return;
     }
-    onLogin(username.trim());
+    onLogin(username.trim(), token);
   };
 
   return (
@@ -53,6 +56,33 @@ export default function LoginScreen({ onLogin, existingUsers }: Props) {
               {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Clave de sincronización
+              </label>
+              <div className="relative">
+                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  ref={tokenInputRef}
+                  type={showToken ? 'text' : 'password'}
+                  value={token}
+                  onChange={e => { setToken(e.target.value); setError(''); }}
+                  placeholder="Nueva para este dispositivo, o la misma en otros"
+                  className="w-full pl-10 pr-10 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowToken(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-white"
+                >
+                  {showToken ? 'Ocultar' : 'Ver'}
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-gray-500">
+                Opcional en modo local. Requerida para sincronizar con el servidor; usa la misma en todos tus dispositivos.
+              </p>
+            </div>
+
             <button
               type="submit"
               className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-red-700 transition-all shadow-lg shadow-orange-900/30 active:scale-95"
@@ -69,7 +99,10 @@ export default function LoginScreen({ onLogin, existingUsers }: Props) {
                 {existingUsers.map(u => (
                   <button
                     key={u}
-                    onClick={() => onLogin(u)}
+                    onClick={() => {
+                      setUsername(u);
+                      tokenInputRef.current?.focus();
+                    }}
                     className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm rounded-lg transition-colors border border-gray-600 hover:border-orange-500"
                   >
                     {u}
@@ -81,7 +114,7 @@ export default function LoginScreen({ onLogin, existingUsers }: Props) {
         </div>
 
         <p className="text-center text-gray-500 text-sm mt-6">
-          Sin contraseña · Sin cuenta · Solo local
+          Modo local por defecto · Añade una clave para sincronizar con el servidor
         </p>
       </div>
     </div>
