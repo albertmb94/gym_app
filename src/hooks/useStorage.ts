@@ -286,7 +286,17 @@ export function useStorage() {
 
   const getAllExercises = useCallback((): Exercise[] => {
     const custom = getCustomExercises();
-    return [...EXERCISES, ...custom];
+    // Merge custom exercises over defaults: a custom exercise sharing an id with a
+    // default one (e.g. an edited default with a changed name/image) must REPLACE it,
+    // not be appended. Appending would leave a duplicate id and `.find()` callers
+    // (template editor, etc.) would resolve to the stale default instead of the edit.
+    const merged = [...EXERCISES];
+    custom.forEach(c => {
+      const idx = merged.findIndex(e => e.id === c.id);
+      if (idx >= 0) merged[idx] = c;
+      else merged.push(c);
+    });
+    return merged;
   }, [getCustomExercises]);
 
   const saveExercise = useCallback((exercise: Exercise) => {

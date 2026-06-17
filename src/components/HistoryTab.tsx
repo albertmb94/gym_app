@@ -1,25 +1,28 @@
 import { useState, useMemo } from 'react';
-import { WorkoutSession, MuscleGroup } from '../types';
+import { WorkoutSession, CardioSession, MuscleGroup } from '../types';
 import { WORKOUT_TYPE_LABELS, WORKOUT_TYPE_COLORS, ALL_MUSCLES } from '../data/exercises';
 import { useExercises } from '../contexts/ExercisesContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { format } from 'date-fns';
 import { es, enUS } from 'date-fns/locale';
-import { ChevronDown, ChevronUp, Trash2, Play, CheckCircle, Clock, Dumbbell, Flame, Filter } from 'lucide-react';
+import { ChevronDown, ChevronUp, Trash2, Play, CheckCircle, Clock, Dumbbell, Flame, Filter, CalendarDays, List } from 'lucide-react';
+import MonthCalendar from './MonthCalendar';
 
 interface Props {
   sessions: WorkoutSession[];
+  cardioSessions?: CardioSession[];
   onDelete: (id: string) => void;
   onContinue: (session: WorkoutSession) => void;
 }
 
 type FilterMode = 'all' | 'muscle' | 'exercise';
 
-export default function HistoryTab({ sessions, onDelete, onContinue }: Props) {
+export default function HistoryTab({ sessions, cardioSessions = [], onDelete, onContinue }: Props) {
   const { t, language } = useLanguage();
   const { allExercises, getExerciseById } = useExercises();
   const dateLocale = language === 'es' ? es : enUS;
 
+  const [showCalendar, setShowCalendar] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
@@ -68,7 +71,7 @@ export default function HistoryTab({ sessions, onDelete, onContinue }: Props) {
 
   const muscleLabels = t.muscles as Record<string, string>;
 
-  if (sorted.length === 0) {
+  if (sorted.length === 0 && cardioSessions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center px-4">
         <Dumbbell className="w-16 h-16 text-gray-700 mb-4" />
@@ -80,6 +83,29 @@ export default function HistoryTab({ sessions, onDelete, onContinue }: Props) {
 
   return (
     <div className="p-4 pb-24 space-y-3">
+      {/* View toggle: list vs month calendar */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowCalendar(v => !v)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-800 border border-gray-700 text-gray-400 hover:text-white transition-colors"
+        >
+          {showCalendar ? <List className="w-4 h-4" /> : <CalendarDays className="w-4 h-4" />}
+          {showCalendar
+            ? (language === 'es' ? 'Ocultar calendario' : 'Hide calendar')
+            : (language === 'es' ? 'Ver calendario' : 'View calendar')}
+        </button>
+      </div>
+
+      {showCalendar && <MonthCalendar sessions={sessions} cardioSessions={cardioSessions} />}
+
+      {sorted.length === 0 && (
+        <div className="text-center py-10 text-gray-500 text-sm">
+          {language === 'es'
+            ? 'No hay entrenamientos de fuerza registrados todavía.'
+            : 'No strength workouts logged yet.'}
+        </div>
+      )}
+
       {/* Filter bar */}
       <div className="space-y-2">
         <div className="flex gap-2">

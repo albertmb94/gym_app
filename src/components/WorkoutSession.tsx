@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { WorkoutSession as WorkoutSessionType, ExerciseLog, SetLog, Exercise, MuscleGroup } from '../types';
 import { useExercises } from '../contexts/ExercisesContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Plus, Trash2, Check, ChevronDown, ChevronUp, Timer, Save, X, Search, GripVertical, Flame } from 'lucide-react';
+import { Plus, Trash2, Check, ChevronDown, ChevronUp, Timer, Save, X, Search, GripVertical, Flame, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { es, enUS } from 'date-fns/locale';
 import NumericInput from './NumericInput';
@@ -11,6 +11,7 @@ interface Props {
   session: WorkoutSessionType;
   onSave: (session: WorkoutSessionType) => void;
   onClose: () => void;
+  onDelete?: (sessionId: string) => void;
   getSuggestedSets: (exerciseId: string, numSets: number, defaultReps: number, defaultWeight: number) => { reps: number; weight: number }[];
 }
 
@@ -18,7 +19,7 @@ function generateId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-export default function WorkoutSession({ session: initialSession, onSave, onClose, getSuggestedSets }: Props) {
+export default function WorkoutSession({ session: initialSession, onSave, onClose, onDelete, getSuggestedSets }: Props) {
   const { allExercises } = useExercises();
   const { t, language } = useLanguage();
   const dateLocale = language === 'es' ? es : enUS;
@@ -26,6 +27,55 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
 
   const [session, setSession] = useState<WorkoutSessionType>(initialSession);
   const [expandedExercise, setExpandedExercise] = useState<string | null>(initialSession.exercises[0]?.id || null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // ── Editable date (log workouts for past days / fix a wrongly-dated one) ──
+  const dateInputValue = (() => {
+    const d = new Date(session.date);
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+    return local.toISOString().split('T')[0];
+  })();
+
+  const handleDateChange = (value: string) => {
+    if (!value) return;
+    const [y, m, day] = value.split('-').map(Number);
+    const orig = new Date(session.date);
+    // Keep the original time-of-day so ordering within a day is preserved
+    const next = new Date(y, m - 1, day, orig.getHours(), orig.getMinutes(), orig.getSeconds());
+    setSession(prev => ({ ...prev, date: next.toISOString() }));
+  };
+
+  // ── Auto-save (pre-save) so a backgrounded/closed app never loses progress ──
+  // onSave upserts by id, so persisting the in-progress session as a draft is safe.
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+
+  const autoSave = () => {
+    const s = sessionRef.current;
+    if (s.exercises.length === 0) return; // nothing worth persisting yet
+    onSaveRef.current(s);
+  };
+
+  // Debounced autosave on every change
+  useEffect(() => {
+    if (session.exercises.length === 0) return;
+    const id = setTimeout(() => onSaveRef.current(sessionRef.current), 1500);
+    return () => clearTimeout(id);
+  }, [session]);
+
+  // Immediate autosave when the app is hidden / backgrounded / unloaded
+  useEffect(() => {
+    const onVisibility = () => { if (document.hidden) autoSave(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', autoSave);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', autoSave);
+    };
+  }, []);
 
   // ── Timer (timestamp-based so it survives backgrounding) ───────────────
   const [timer, setTimer] = useState(0);
@@ -233,11 +283,27 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
     <div className="fixed inset-0 bg-gray-900 z-50 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between flex-shrink-0">
-        <div>
-          <h2 className="text-white font-bold text-lg">{session.name}</h2>
-          <p className="text-gray-400 text-sm">{format(new Date(session.date), 'EEEE d MMM', { locale: dateLocale })}</p>
+        <div className="min-w-0">
+          <h2 className="text-white font-bold text-lg truncate">{session.name}</h2>
+          <button
+            onClick={() => setShowDatePicker(v => !v)}
+            className="flex items-center gap-1 text-gray-400 hover:text-orange-400 text-sm transition-colors"
+          >
+            <Calendar className="w-3.5 h-3.5" />
+            <span className="capitalize">{format(new Date(session.date), 'EEEE d MMM', { locale: dateLocale })}</span>
+            <ChevronDown className="w-3.5 h-3.5" />
+          </button>
+          {showDatePicker && (
+            <input
+              type="date"
+              value={dateInputValue}
+              max={new Date().toISOString().split('T')[0]}
+              onChange={e => handleDateChange(e.target.value)}
+              className="mt-2 bg-gray-700 border border-gray-600 rounded-lg px-2 py-1 text-white text-sm focus:outline-none focus:border-orange-500"
+            />
+          )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button
             onClick={toggleTimer}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-mono font-bold transition-colors ${timerRunning ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-300'}`}
@@ -245,11 +311,53 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
             <Timer className="w-4 h-4" />
             {formatTime(timer)}
           </button>
+          {onDelete && (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="text-gray-400 hover:text-red-400 p-1"
+              title={language === 'es' ? 'Eliminar entrenamiento' : 'Delete workout'}
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+          )}
           <button onClick={onClose} className="text-gray-400 hover:text-white p-1">
             <X className="w-5 h-5" />
           </button>
         </div>
       </div>
+
+      {/* Delete confirmation */}
+      {confirmDelete && onDelete && (
+        <div className="fixed inset-0 bg-black/70 z-[80] flex items-center justify-center p-4">
+          <div className="bg-gray-800 border border-gray-700 rounded-2xl p-5 w-full max-w-sm space-y-4">
+            <div className="flex items-center gap-3">
+              <Trash2 className="w-6 h-6 text-red-400 flex-shrink-0" />
+              <div>
+                <h3 className="text-white font-bold">{language === 'es' ? 'Eliminar entrenamiento' : 'Delete workout'}</h3>
+                <p className="text-gray-400 text-sm mt-0.5">
+                  {language === 'es'
+                    ? '¿Seguro que quieres eliminar este entrenamiento? No se puede deshacer.'
+                    : 'Are you sure you want to delete this workout? This cannot be undone.'}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { onDelete(session.id); setConfirmDelete(false); onClose(); }}
+                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700"
+              >
+                {t.general.delete}
+              </button>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="flex-1 py-2.5 bg-gray-700 text-gray-200 rounded-xl font-semibold hover:bg-gray-600"
+              >
+                {t.general.cancel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats bar */}
       <div className="bg-gray-800/50 border-b border-gray-700 px-4 py-2 flex gap-6 flex-shrink-0">

@@ -212,6 +212,7 @@ function AppInner() {
           {activeTab === 'history' && (
             <HistoryTab
               sessions={sessions}
+              cardioSessions={cardioSessions}
               onDelete={deleteSession}
               onContinue={handleContinueSession}
             />
@@ -292,6 +293,7 @@ function AppInner() {
           session={activeSession}
           onSave={handleSaveSession}
           onClose={handleCloseSession}
+          onDelete={deleteSession}
           getSuggestedSets={getSuggestedSets}
         />
       )}
