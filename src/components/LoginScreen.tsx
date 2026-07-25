@@ -1,122 +1,268 @@
 import { useState, useRef } from 'react';
-import { Dumbbell, User, LogIn, KeyRound } from 'lucide-react';
+import { Eye, EyeOff, KeyRound, User, Loader2, Trash2, Dumbbell } from 'lucide-react';
+import { Field, TextInput } from './ui/Field';
+import { Button } from './ui/Button';
+import { useLanguage } from '../contexts/LanguageContext';
+import type { LoginResult } from '../hooks/useStorage';
+import type { StoredUser } from '../hooks/useStorage';
+import { cn } from '../utils/cn';
 
 interface Props {
-  onLogin: (username: string, token: string) => void;
-  existingUsers: string[];
+  onLogin: (username: string, token: string) => Promise<LoginResult>;
+  onRegister: (username: string, token: string) => Promise<LoginResult>;
+  knownUsers: StoredUser[];
+  onRemoveUser: (userId: string) => void;
 }
 
-export default function LoginScreen({ onLogin, existingUsers }: Props) {
-  const [username, setUsername] = useState('');
-  const [token, setToken] = useState('');
-  const [showToken, setShowToken] = useState(false);
-  const [error, setError] = useState('');
-  const tokenInputRef = useRef<HTMLInputElement>(null);
+type Mode = 'login' | 'register';
 
-  const handleSubmit = (e: React.FormEvent) => {
+export default function LoginScreen({ onLogin, onRegister, knownUsers, onRemoveUser }: Props) {
+  const { t } = useLanguage();
+  const usernameRef = useRef<HTMLInputElement>(null);
+
+  const [mode, setMode] = useState<Mode>('login');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim()) {
-      setError('Por favor, introduce un nombre de usuario.');
+    setError('');
+    const cleanUsername = username.trim();
+    if (!cleanUsername) {
+      setError(t.auth.usernameRequired);
+      usernameRef.current?.focus();
       return;
     }
-    onLogin(username.trim(), token);
+    if (!/^[a-z0-9._-]{2,32}$/i.test(cleanUsername)) {
+      setError(t.auth.usernameHelp);
+      return;
+    }
+    if (password.length < 8) {
+      setError(t.auth.passwordHelp);
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const result = mode === 'login'
+        ? await onLogin(cleanUsername, password)
+        : await onRegister(cleanUsername, password);
+      if (!result.ok) {
+        const key = result.error === 'taken'
+          ? 'usernameTaken'
+          : result.error === 'invalid' || result.error === 'credentials'
+            ? 'invalidCredentials'
+            : 'network';
+        setError(t.errors[key] || result.message);
+        return;
+      }
+      if (mode === 'register' && result.recoveryCode) {
+        setRecoveryCode(result.recoveryCode);
+      }
+    } catch (err) {
+      setError(t.errors.generic);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 shadow-2xl mb-4">
-            <Dumbbell className="w-10 h-10 text-white" />
+  if (recoveryCode) {
+    return (
+      <main
+        role="main"
+        className="grid min-h-dvh place-items-center bg-canvas px-4 py-8"
+      >
+        <div className="w-full max-w-md surface p-6 shadow-2xl">
+          <h1 className="text-xl font-bold text-primary">{t.profile.recoveryCode}</h1>
+          <p className="mt-2 text-sm text-secondary">{t.profile.recoveryCodeDesc}</p>
+          <div
+            role="status"
+            aria-live="polite"
+            className="mt-4 rounded-2xl border border-amber-400/40 bg-amber-500/10 p-4 text-center font-mono text-2xl tracking-widest text-amber-200"
+          >
+            {recoveryCode}
           </div>
-          <h1 className="text-3xl font-bold text-white">GymTracker Pro</h1>
-          <p className="text-gray-400 mt-1">Tu entrenamiento, bajo control</p>
-        </div>
-
-        {/* Form */}
-        <div className="bg-gray-800 rounded-2xl shadow-2xl p-8 border border-gray-700">
-          <h2 className="text-xl font-semibold text-white mb-6">Acceder / Registrarse</h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Nombre de usuario
-              </label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  value={username}
-                  onChange={e => { setUsername(e.target.value); setError(''); }}
-                  placeholder="Escribe tu nombre..."
-                  className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-colors"
-                  autoFocus
-                />
-              </div>
-              {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Clave de sincronización
-              </label>
-              <div className="relative">
-                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  ref={tokenInputRef}
-                  type={showToken ? 'text' : 'password'}
-                  value={token}
-                  onChange={e => { setToken(e.target.value); setError(''); }}
-                  placeholder="Nueva para este dispositivo, o la misma en otros"
-                  className="w-full pl-10 pr-10 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-colors"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowToken(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-white"
-                >
-                  {showToken ? 'Ocultar' : 'Ver'}
-                </button>
-              </div>
-              <p className="mt-2 text-xs text-gray-500">
-                Opcional en modo local. Requerida para sincronizar con el servidor; usa la misma en todos tus dispositivos.
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-red-700 transition-all shadow-lg shadow-orange-900/30 active:scale-95"
+          <div className="mt-4 flex gap-2">
+            <Button
+              variant="secondary"
+              fullWidth
+              onClick={() => {
+                navigator.clipboard?.writeText(recoveryCode);
+              }}
             >
-              <LogIn className="w-5 h-5" />
-              Entrar
-            </button>
-          </form>
-
-          {existingUsers.length > 0 && (
-            <div className="mt-6">
-              <p className="text-sm text-gray-400 mb-3">Usuarios recientes:</p>
-              <div className="flex flex-wrap gap-2">
-                {existingUsers.map(u => (
-                  <button
-                    key={u}
-                    onClick={() => {
-                      setUsername(u);
-                      tokenInputRef.current?.focus();
-                    }}
-                    className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm rounded-lg transition-colors border border-gray-600 hover:border-orange-500"
-                  >
-                    {u}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+              {t.profile.copy}
+            </Button>
+            <Button variant="primary" fullWidth onClick={() => setRecoveryCode(null)}>
+              {t.general.continue}
+            </Button>
+          </div>
         </div>
+      </main>
+    );
+  }
 
-        <p className="text-center text-gray-500 text-sm mt-6">
-          Modo local por defecto · Añade una clave para sincronizar con el servidor
-        </p>
+  return (
+    <main
+      role="main"
+      className="relative grid min-h-dvh place-items-center bg-canvas overflow-hidden px-4 py-8"
+    >
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,122,26,0.18),transparent_55%),radial-gradient(circle_at_80%_70%,rgba(232,93,4,0.16),transparent_55%)]"
+      />
+      <div className="relative w-full max-w-md space-y-6">
+        <header className="text-center">
+          <div
+            aria-hidden="true"
+            className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-3xl bg-gradient-to-br from-orange-400 to-rose-500 text-white shadow-xl"
+          >
+            <Dumbbell className="h-8 w-8" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-primary">{t.app.name}</h1>
+          <p className="mt-1 text-sm text-secondary">{t.auth.welcome}</p>
+        </header>
+
+        <section className="surface p-6 shadow-2xl">
+          <div role="tablist" aria-label={t.nav.primary} className="mb-5 grid grid-cols-2 rounded-2xl bg-surface-2 p-1">
+            <button
+              role="tab"
+              type="button"
+              aria-selected={mode === 'login'}
+              onClick={() => setMode('login')}
+              className={cn(
+                'rounded-xl py-2 text-sm font-semibold transition-colors',
+                mode === 'login' ? 'bg-orange-500 text-white' : 'text-secondary hover:text-primary',
+              )}
+            >
+              {t.auth.signIn}
+            </button>
+            <button
+              role="tab"
+              type="button"
+              aria-selected={mode === 'register'}
+              onClick={() => setMode('register')}
+              className={cn(
+                'rounded-xl py-2 text-sm font-semibold transition-colors',
+                mode === 'register' ? 'bg-orange-500 text-white' : 'text-secondary hover:text-primary',
+              )}
+            >
+              {t.auth.register}
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            <Field label={t.auth.username} required>
+              {(id) => (
+                <div className="relative">
+                  <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
+                  <TextInput
+                    id={id}
+                    ref={usernameRef}
+                    type="text"
+                    autoComplete="username"
+                    spellCheck={false}
+                    inputMode="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="pl-9"
+                    invalid={Boolean(error) && !username.trim()}
+                    autoFocus
+                  />
+                </div>
+              )}
+            </Field>
+
+            <Field
+              label={t.auth.password}
+              required
+              description={t.auth.passwordHelp}
+            >
+              {(id) => (
+                <div className="relative">
+                  <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
+                  <TextInput
+                    id={id}
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pl-9 pr-10"
+                    invalid={Boolean(error) && password.length < 8}
+                    minLength={8}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? t.auth.hidePassword : t.auth.showPassword}
+                    className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-muted hover:bg-white/5 hover:text-primary"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                  </button>
+                </div>
+              )}
+            </Field>
+
+            {error && (
+              <p role="alert" className="text-sm text-red-400">
+                {error}
+              </p>
+            )}
+
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={submitting}
+              iconLeft={submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            >
+              {mode === 'login' ? t.auth.signIn : t.auth.register}
+            </Button>
+
+            <p className="text-center text-xs text-muted">
+              {mode === 'login' ? t.auth.localOnly : t.auth.syncBenefit}
+            </p>
+          </form>
+        </section>
+
+        {knownUsers.length > 0 && (
+          <section className="surface p-4 shadow-2xl">
+            <h2 className="px-2 pb-2 text-sm font-semibold text-secondary">{t.auth.recentUsers}</h2>
+            <ul className="space-y-1">
+              {knownUsers.map((user) => (
+                <li key={user.userId} className="flex items-center justify-between gap-2 rounded-xl px-2 py-2 hover:bg-white/5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUsername(user.username);
+                      usernameRef.current?.focus();
+                    }}
+                    className="flex flex-1 items-center gap-3 text-left"
+                  >
+                    <span aria-hidden="true" className="grid h-9 w-9 place-items-center rounded-full bg-orange-500/20 text-orange-200">
+                      {user.username.slice(0, 1).toUpperCase()}
+                    </span>
+                    <span className="text-sm font-medium text-primary">{user.username}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm(t.auth.removeUserConfirm)) onRemoveUser(user.userId);
+                    }}
+                    aria-label={`${t.auth.removeUser}: ${user.username}`}
+                    className="grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-red-500/10 hover:text-red-300"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
-    </div>
+    </main>
   );
 }

@@ -1,233 +1,298 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { AppData, UserProfile, WorkoutSession, WorkoutTemplate, WeeklyPlan, PhysicalProfile, Exercise, CardioSession } from '../types';
+import type {
+  AppData, UserProfile, WorkoutSession, WorkoutTemplate, WeeklyPlan,
+  PhysicalProfile, Exercise, CardioSession,
+} from '../types';
+import { defaultAppData, loadAppData, saveAppData, loadTokens, saveTokens, STORAGE_KEYS } from '../data/repository';
 import { DEFAULT_TEMPLATES, EXERCISES } from '../data/exercises';
-import { fetchUserData, pushUserData, mergeServerData, isServerAvailable } from '../lib/serverSync';
-import { generateId } from '../lib/id';
+import { SyncEngine, mergeServerData } from '../lib/syncEngine';
+import type { SyncState } from '../lib/sync';
+import { authLogin, authRegister } from '../lib/sync';
+import { generateId } from '../utils/id';
+import { progressiveOverload } from '../utils/suggestions';
+import { estimateStrengthCalories, estimateCardioCalories } from '../utils/metrics';
 
-const STORAGE_KEY = 'gymtracker_data';
-const LAST_SYNCED_KEY = 'gymtracker_last_synced';
-const TOKENS_KEY = 'gymtracker_tokens';
+export interface StoredUser {
+  userId: string;
+  username: string;
+  lastSeen: number;
+}
 
-const defaultAppData: AppData = {
-  users: {},
-  sessions: {},
-  cardioSessions: {},
-};
+export interface UseStorageResult {
+  appData: AppData;
+  currentUser: string | null;
+  currentUserId: string | null;
+  login: (username: string, token: string) => Promise<LoginResult>;
+  register: (username: string, token: string) => Promise<LoginResult>;
+  logout: () => void;
+  switchUser: (username: string) => Promise<void>;
+  knownUsers: StoredUser[];
+  removeKnownUser: (userId: string) => void;
+  syncStatus: SyncState;
+  syncConflict: { serverRevision: number; serverData: AppData | null } | null;
+  resolveConflict: (strategy: 'local' | 'remote' | 'merge') => Promise<void>;
+  forceSyncNow: () => Promise<void>;
+  getProfile: () => UserProfile | null;
+  getSessions: () => WorkoutSession[];
+  saveSession: (session: WorkoutSession) => void;
+  deleteSession: (sessionId: string) => void;
+  duplicateSession: (sessionId: string, newDate?: string) => WorkoutSession | null;
+  updateWeeklyPlan: (plan: WeeklyPlan) => void;
+  saveTemplate: (template: WorkoutTemplate) => void;
+  deleteTemplate: (templateId: string) => void;
+  getAllTemplates: () => WorkoutTemplate[];
+  getSuggestedSets: (exerciseId: string, numSets: number, defaultReps: number, defaultWeight: number) => { reps: number; weight: number }[];
+  updatePhysicalProfile: (profile: PhysicalProfile) => void;
+  getPhysicalProfile: () => PhysicalProfile | null;
+  getCustomExercises: () => Exercise[];
+  getAllExercises: () => Exercise[];
+  saveExercise: (exercise: Exercise) => void;
+  updateExercise: (exerciseId: string, updates: Partial<Exercise>) => void;
+  deleteExercise: (exerciseId: string) => void;
+  unhideExercise: (exerciseId: string) => void;
+  getHiddenExerciseIds: () => string[];
+  getCardioSessions: () => CardioSession[];
+  saveCardioSession: (session: CardioSession) => void;
+  deleteCardioSession: (sessionId: string) => void;
+  estimateWorkoutCalories: (session: WorkoutSession) => number;
+  estimateCardioCalories: (cardioTypeId: string, durationMinutes: number, avgHeartRate: number) => number;
+  exportUserData: () => void;
+  importUserData: (jsonString: string) => ImportResult;
+  downloadTemplate: () => void;
+  downloadExerciseNames: () => void;
+  updateUserPreferences: (prefs: Partial<NonNullable<UserProfile['preferences']>>) => void;
+}
 
-function getLastSyncedAt(username: string): number {
+export type LoginResult =
+  | { ok: true; recoveryCode?: string }
+  | { ok: false; error: 'invalid' | 'taken' | 'network' | 'credentials'; message: string };
+
+export type ImportResult =
+  | { ok: true; added: { sessions: number; cardio: number; exercises: number; templates: number } }
+  | { ok: false; error: 'invalid' | 'empty'; message: string };
+
+const KNOWN_USERS_KEY = 'gymtracker.v2.knownUsers';
+
+function loadKnownUsers(): StoredUser[] {
   try {
-    const raw = localStorage.getItem(LAST_SYNCED_KEY);
-    if (!raw) return 0;
-    const map = JSON.parse(raw) as Record<string, number>;
-    return map[username] || 0;
+    const raw = localStorage.getItem(KNOWN_USERS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw) as StoredUser[];
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((u) => u && typeof u.userId === 'string');
   } catch {
-    return 0;
+    return [];
   }
 }
 
-function setLastSyncedAt(username: string, ts: number) {
+function saveKnownUsers(users: StoredUser[]): void {
   try {
-    const raw = localStorage.getItem(LAST_SYNCED_KEY) || '{}';
-    const map = JSON.parse(raw) as Record<string, number>;
-    map[username] = ts;
-    localStorage.setItem(LAST_SYNCED_KEY, JSON.stringify(map));
+    localStorage.setItem(KNOWN_USERS_KEY, JSON.stringify(users));
   } catch {
-    // ignore
+    /* ignore */
   }
 }
 
-function clearLastSyncedAt(username: string) {
-  try {
-    const raw = localStorage.getItem(LAST_SYNCED_KEY) || '{}';
-    const map = JSON.parse(raw) as Record<string, number>;
-    delete map[username];
-    localStorage.setItem(LAST_SYNCED_KEY, JSON.stringify(map));
-  } catch {
-    // ignore
-  }
+function normalizeUsernameKey(s: string): string {
+  return s.trim().toLowerCase().normalize('NFKC');
 }
 
-function getUserToken(username: string): string | null {
-  try {
-    const raw = localStorage.getItem(TOKENS_KEY);
-    if (!raw) return null;
-    const map = JSON.parse(raw) as Record<string, string>;
-    return map[username] || null;
-  } catch {
-    return null;
-  }
-}
-
-function setUserToken(username: string, token: string) {
-  try {
-    const raw = localStorage.getItem(TOKENS_KEY) || '{}';
-    const map = JSON.parse(raw) as Record<string, string>;
-    map[username] = token;
-    localStorage.setItem(TOKENS_KEY, JSON.stringify(map));
-  } catch {
-    // ignore
-  }
-}
-
-function clearUserToken(username: string) {
-  try {
-    const raw = localStorage.getItem(TOKENS_KEY) || '{}';
-    const map = JSON.parse(raw) as Record<string, string>;
-    delete map[username];
-    localStorage.setItem(TOKENS_KEY, JSON.stringify(map));
-  } catch {
-    // ignore
-  }
-}
-
-function loadData(): AppData {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultAppData;
-    return JSON.parse(raw);
-  } catch {
-    return defaultAppData;
-  }
-}
-
-function saveData(data: AppData) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
-export function useStorage() {
-  const [appData, setAppData] = useState<AppData>(loadData);
+export function useStorage(): UseStorageResult {
+  const [appData, setAppData] = useState<AppData>(() => loadAppData());
   const [currentUser, setCurrentUser] = useState<string | null>(() => {
-    return localStorage.getItem('gymtracker_current_user');
+    try {
+      return localStorage.getItem(STORAGE_KEYS.currentUser);
+    } catch {
+      return null;
+    }
   });
+  const [knownUsers, setKnownUsers] = useState<StoredUser[]>(() => loadKnownUsers());
+  const [syncStatus, setSyncStatus] = useState<SyncState>({ kind: 'idle' });
+  const [syncConflict, setSyncConflict] = useState<{ serverRevision: number; serverData: AppData | null } | null>(null);
 
-  useEffect(() => {
-    saveData(appData);
-  }, [appData]);
+  const tokensRef = useRef<Record<string, string>>(loadTokens());
+  const engineRef = useRef<SyncEngine | null>(null);
+  const appDataRef = useRef(appData);
+  appDataRef.current = appData;
+  const currentUserRef = useRef(currentUser);
+  currentUserRef.current = currentUser;
+
+  const persist = useCallback((next: AppData) => {
+    setAppData(next);
+    saveAppData(next);
+  }, []);
+
+  const persistUser = useCallback((mutator: (data: AppData, username: string) => AppData) => {
+    setAppData((prev) => {
+      const username = currentUserRef.current;
+      if (!username) return prev;
+      const next = mutator(prev, username);
+      saveAppData(next);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (currentUser) {
-      localStorage.setItem('gymtracker_current_user', currentUser);
+      localStorage.setItem(STORAGE_KEYS.currentUser, currentUser);
     } else {
-      localStorage.removeItem('gymtracker_current_user');
+      localStorage.removeItem(STORAGE_KEYS.currentUser);
     }
   }, [currentUser]);
 
-  // ----- Server sync (cross-device persistence) -----
-  const [serverOn, setServerOn] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error' | 'offline'>('idle');
-  const pushTimer = useRef<number | null>(null);
-  const lastPushed = useRef<string>('');
-  const pullCompleted = useRef<Set<string>>(new Set());
-
-  // Detect server availability once
-  useEffect(() => {
-    isServerAvailable().then(setServerOn);
+  const rememberUser = useCallback((username: string) => {
+    const normalized = normalizeUsernameKey(username);
+    setKnownUsers((prev) => {
+      const existing = prev.filter((u) => u.userId !== normalized);
+      const updated = [{ userId: normalized, username, lastSeen: Date.now() }, ...existing].slice(0, 20);
+      saveKnownUsers(updated);
+      return updated;
+    });
   }, []);
 
-  // On user change: pull latest from server (server is source of truth if newer)
-  useEffect(() => {
-    if (!currentUser || !serverOn) return;
-    if (pullCompleted.current.has(currentUser)) return;
-    pullCompleted.current.add(currentUser);
-    setSyncStatus('syncing');
-    fetchUserData(currentUser, () => getUserToken(currentUser)).then(remote => {
-      pullCompleted.current.add(currentUser);
-      if (remote?.data) {
-        setAppData(prev => {
-          const lastSyncedAt = getLastSyncedAt(currentUser);
-          const { merged, appliedRemote } = mergeServerData(
-            prev,
-            currentUser,
-            { ...remote.data, updatedAt: remote.updatedAt },
-            lastSyncedAt
-          );
-          if (appliedRemote) {
-            setLastSyncedAt(currentUser, remote.updatedAt);
-          }
-          lastPushed.current = JSON.stringify({
-            users: { [currentUser]: merged.users[currentUser] },
-            sessions: { [currentUser]: merged.sessions[currentUser] || [] },
-            cardioSessions: { [currentUser]: (merged.cardioSessions || {})[currentUser] || [] },
-          });
-          return merged;
-        });
-      }
-      setSyncStatus('synced');
-    }).catch(() => {
-      pullCompleted.current.add(currentUser);
-      setSyncStatus('error');
-    });
-  }, [currentUser, serverOn]);
+  const getToken = useCallback(() => {
+    const username = currentUserRef.current;
+    if (!username) return null;
+    return tokensRef.current[username] || null;
+  }, []);
 
-  // Debounced push to server on any change
-  useEffect(() => {
-    if (!currentUser || !serverOn) return;
-    if (!pullCompleted.current.has(currentUser)) return;
-    const slice = JSON.stringify({
-      users: { [currentUser]: appData.users[currentUser] },
-      sessions: { [currentUser]: appData.sessions[currentUser] || [] },
-      cardioSessions: { [currentUser]: (appData.cardioSessions || {})[currentUser] || [] },
-    });
-    if (slice === lastPushed.current) return;
-    if (pushTimer.current) window.clearTimeout(pushTimer.current);
-    setSyncStatus('syncing');
-    pushTimer.current = window.setTimeout(async () => {
-      const result = await pushUserData(currentUser, appData, () => getUserToken(currentUser));
-      if (result.ok) {
-        lastPushed.current = slice;
-        if (result.updatedAt) {
-          setLastSyncedAt(currentUser, result.updatedAt);
-        }
-        setSyncStatus('synced');
-      } else {
-        setSyncStatus('error');
-      }
-    }, 800);
-    return () => {
-      if (pushTimer.current) window.clearTimeout(pushTimer.current);
-    };
-  }, [appData, currentUser, serverOn]);
+  const setToken = useCallback((username: string, token: string) => {
+    const normalized = normalizeUsernameKey(username);
+    tokensRef.current = { ...tokensRef.current, [normalized]: token };
+    saveTokens(tokensRef.current);
+  }, []);
 
-  const login = useCallback((username: string, token?: string) => {
-    const trimmed = username.trim();
-    if (!trimmed) return false;
-    if (token) {
-      setUserToken(trimmed, token);
+  const startEngine = useCallback((username: string) => {
+    if (engineRef.current) engineRef.current.stop();
+    const engine = new SyncEngine({
+      username: normalizeUsernameKey(username),
+      getToken,
+      getCurrentData: () => appDataRef.current,
+      onState: setSyncStatus,
+      onRemotePulled: (remote, _revision) => {
+        setAppData((prev) => mergeServerData(prev, normalizeUsernameKey(username), remote));
+      },
+      onConflict: (serverRevision, serverData) => {
+        setSyncConflict({ serverRevision, serverData });
+      },
+      onUnauthorized: () => {
+        delete tokensRef.current[normalizeUsernameKey(username)];
+        saveTokens(tokensRef.current);
+      },
+    });
+    engineRef.current = engine;
+    void engine.start();
+  }, [getToken]);
+
+  const stopEngine = useCallback(() => {
+    if (engineRef.current) {
+      engineRef.current.stop();
+      engineRef.current = null;
     }
-    setAppData(prev => {
-      if (!prev.users[trimmed]) {
-        const newUser: UserProfile = {
-          username: trimmed,
-          createdAt: new Date().toISOString(),
-          weeklyPlan: {
-            daysPerWeek: 3,
-            days: [],
-          },
-          customTemplates: [],
-        };
-        const updated = {
-          ...prev,
-          users: { ...prev.users, [trimmed]: newUser },
-          sessions: { ...prev.sessions, [trimmed]: [] },
-        };
-        saveData(updated);
-        return updated;
-      }
-      return prev;
-    });
-    setCurrentUser(trimmed);
-    return true;
   }, []);
+
+  useEffect(() => {
+    return () => stopEngine();
+  }, [stopEngine]);
+
+  const performLogin = useCallback(async (
+    username: string,
+    token: string,
+    mode: 'login' | 'register',
+  ): Promise<LoginResult> => {
+    const normalized = normalizeUsernameKey(username);
+    if (normalized.length < 2 || normalized.length > 32) {
+      return { ok: false, error: 'invalid', message: 'Username must be 2-32 characters' };
+    }
+    if (token.length < 8) {
+      return { ok: false, error: 'credentials', message: 'Password must be at least 8 characters' };
+    }
+    setToken(normalized, token);
+    setSyncStatus({ kind: 'pulling' });
+
+    let result;
+    if (mode === 'register') {
+      const initial: AppData = {
+        ...defaultAppData(),
+        users: { [normalized]: createInitialProfile(normalized) },
+        sessions: { [normalized]: [] },
+        cardioSessions: { [normalized]: [] },
+        revision: 1,
+      };
+      result = await authRegister(normalized, token, initial);
+    } else {
+      result = await authLogin(normalized, token);
+    }
+
+    if (!result.ok) {
+      if (result.kind === 'conflict') {
+        return { ok: false, error: 'taken', message: 'Username already taken' };
+      }
+      if (result.kind === 'unauthorized') {
+        return { ok: false, error: 'credentials', message: 'Invalid credentials' };
+      }
+      if (result.kind === 'offline') {
+        return { ok: false, error: 'network', message: result.message };
+      }
+      return { ok: false, error: 'network', message: result.message };
+    }
+
+    setAppData((prev) => {
+      const next: AppData = {
+        ...prev,
+        users: { ...prev.users, [normalized]: prev.users[normalized] || createInitialProfile(normalized) },
+        sessions: { ...prev.sessions, [normalized]: prev.sessions[normalized] || [] },
+        cardioSessions: { ...(prev.cardioSessions || {}), [normalized]: prev.cardioSessions?.[normalized] || [] },
+      };
+      saveAppData(next);
+      return next;
+    });
+    setCurrentUser(normalized);
+    rememberUser(normalized);
+    startEngine(normalized);
+
+    const recoveryCode = mode === 'register' && 'recoveryCode' in result.data
+      ? result.data.recoveryCode
+      : undefined;
+    return { ok: true, recoveryCode };
+  }, [rememberUser, setToken, startEngine]);
+
+  const login = useCallback(
+    (username: string, token: string) => performLogin(username, token, 'login'),
+    [performLogin],
+  );
+
+  const register = useCallback(
+    (username: string, token: string) => performLogin(username, token, 'register'),
+    [performLogin],
+  );
 
   const logout = useCallback(() => {
-    if (currentUser) {
-      pullCompleted.current.delete(currentUser);
-      clearLastSyncedAt(currentUser);
-      clearUserToken(currentUser);
-      lastPushed.current = '';
-    }
+    stopEngine();
     setCurrentUser(null);
-  }, [currentUser]);
+    setSyncStatus({ kind: 'idle' });
+    setSyncConflict(null);
+  }, [stopEngine]);
+
+  const switchUser = useCallback(async (username: string) => {
+    setCurrentUser(username);
+    setSyncStatus({ kind: 'pulling' });
+    setSyncConflict(null);
+    startEngine(username);
+  }, [startEngine]);
+
+  const removeKnownUser = useCallback((userId: string) => {
+    setKnownUsers((prev) => {
+      const next = prev.filter((u) => u.userId !== userId);
+      saveKnownUsers(next);
+      return next;
+    });
+    if (tokensRef.current[userId]) {
+      const { [userId]: _, ...rest } = tokensRef.current;
+      tokensRef.current = rest;
+      saveTokens(tokensRef.current);
+    }
+  }, []);
 
   const getProfile = useCallback((): UserProfile | null => {
     if (!currentUser) return null;
@@ -239,157 +304,150 @@ export function useStorage() {
     return appData.sessions[currentUser] || [];
   }, [appData, currentUser]);
 
+  const markDirty = useCallback(() => {
+    engineRef.current?.markDirty();
+  }, []);
+
   const saveSession = useCallback((session: WorkoutSession) => {
-    if (!currentUser) return;
-    setAppData(prev => {
-      const userSessions = prev.sessions[currentUser] || [];
-      const idx = userSessions.findIndex(s => s.id === session.id);
+    persistUser((prev, username) => {
+      const list = prev.sessions[username] || [];
+      const idx = list.findIndex((s) => s.id === session.id);
       const updated = idx >= 0
-        ? userSessions.map(s => s.id === session.id ? session : s)
-        : [...userSessions, session];
-      return {
-        ...prev,
-        sessions: { ...prev.sessions, [currentUser]: updated },
-      };
+        ? list.map((s) => (s.id === session.id ? session : s))
+        : [...list, session];
+      return { ...prev, sessions: { ...prev.sessions, [username]: updated } };
     });
-  }, [currentUser]);
+    markDirty();
+  }, [markDirty, persistUser]);
 
   const deleteSession = useCallback((sessionId: string) => {
-    if (!currentUser) return;
-    setAppData(prev => {
-      const userSessions = prev.sessions[currentUser] || [];
-      return {
-        ...prev,
-        sessions: { ...prev.sessions, [currentUser]: userSessions.filter(s => s.id !== sessionId) },
-      };
-    });
-  }, [currentUser]);
+    persistUser((prev, username) => ({
+      ...prev,
+      sessions: {
+        ...prev.sessions,
+        [username]: (prev.sessions[username] || []).filter((s) => s.id !== sessionId),
+      },
+    }));
+    markDirty();
+  }, [markDirty, persistUser]);
+
+  const duplicateSession = useCallback((sessionId: string, newDate?: string): WorkoutSession | null => {
+    if (!currentUser) return null;
+    const sessions = appData.sessions[currentUser] || [];
+    const original = sessions.find((s) => s.id === sessionId);
+    if (!original) return null;
+    const date = newDate || new Date().toISOString();
+    const copy: WorkoutSession = {
+      ...original,
+      id: generateId('workout'),
+      date,
+      completed: false,
+      durationMinutes: undefined,
+      caloriesBurned: undefined,
+      exercises: original.exercises.map((ex) => ({
+        ...ex,
+        id: generateId('exlog'),
+        sets: ex.sets.map((s) => ({ ...s, id: generateId('set'), completed: false })),
+      })),
+    };
+    saveSession(copy);
+    return copy;
+  }, [appData, currentUser, saveSession]);
 
   const updateWeeklyPlan = useCallback((plan: WeeklyPlan) => {
-    if (!currentUser) return;
-    setAppData(prev => {
-      const user = prev.users[currentUser];
+    persistUser((prev, username) => {
+      const user = prev.users[username];
       if (!user) return prev;
       return {
         ...prev,
-        users: { ...prev.users, [currentUser]: { ...user, weeklyPlan: plan } },
+        users: { ...prev.users, [username]: { ...user, weeklyPlan: plan } },
       };
     });
-  }, [currentUser]);
+    markDirty();
+  }, [markDirty, persistUser]);
 
   const saveTemplate = useCallback((template: WorkoutTemplate) => {
-    if (!currentUser) return;
-    setAppData(prev => {
-      const user = prev.users[currentUser];
+    persistUser((prev, username) => {
+      const user = prev.users[username];
       if (!user) return prev;
-      const existing = user.customTemplates || [];
-      const idx = existing.findIndex(t => t.id === template.id);
+      const list = user.customTemplates || [];
+      const idx = list.findIndex((t) => t.id === template.id);
       const updated = idx >= 0
-        ? existing.map(t => t.id === template.id ? template : t)
-        : [...existing, template];
+        ? list.map((t) => (t.id === template.id ? template : t))
+        : [...list, template];
       return {
         ...prev,
-        users: { ...prev.users, [currentUser]: { ...user, customTemplates: updated } },
+        users: { ...prev.users, [username]: { ...user, customTemplates: updated } },
       };
     });
-  }, [currentUser]);
+    markDirty();
+  }, [markDirty, persistUser]);
 
   const deleteTemplate = useCallback((templateId: string) => {
-    if (!currentUser) return;
-    setAppData(prev => {
-      const user = prev.users[currentUser];
+    persistUser((prev, username) => {
+      const user = prev.users[username];
       if (!user) return prev;
       return {
         ...prev,
-        users: { ...prev.users, [currentUser]: { ...user, customTemplates: user.customTemplates.filter(t => t.id !== templateId) } },
+        users: {
+          ...prev.users,
+          [username]: {
+            ...user,
+            customTemplates: (user.customTemplates || []).filter((t) => t.id !== templateId),
+            weeklyPlan: {
+              ...user.weeklyPlan,
+              days: user.weeklyPlan.days.map((d) =>
+                d.templateId === templateId ? { ...d, templateId: null } : d,
+              ),
+            },
+          },
+        },
       };
     });
-  }, [currentUser]);
+    markDirty();
+  }, [markDirty, persistUser]);
 
   const getAllTemplates = useCallback((): WorkoutTemplate[] => {
-    const profile = getProfile();
-    const custom = profile?.customTemplates || [];
-    return [...DEFAULT_TEMPLATES, ...custom];
+    const custom = getProfile()?.customTemplates || [];
+    const customIds = new Set(custom.map((t) => t.id));
+    return [...DEFAULT_TEMPLATES, ...custom.filter((t) => !DEFAULT_TEMPLATES.some((d) => d.id === t.id) || customIds.has(t.id))];
   }, [getProfile]);
 
-  // Smart weight suggestion based on last sessions of an exercise
-  const getSuggestedSets = useCallback((exerciseId: string, numSets: number, defaultReps: number, defaultWeight: number) => {
+  const getSuggestedSets = useCallback((
+    exerciseId: string,
+    numSets: number,
+    defaultReps: number,
+    defaultWeight: number,
+  ) => {
     const sessions = getSessions();
-    // Find last 3 sessions with this exercise
-    const relevantSessions = sessions
-      .filter(s => s.completed && s.exercises.some(e => e.exerciseId === exerciseId))
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 3);
-
-    if (relevantSessions.length === 0) {
-      return Array.from({ length: numSets }, () => ({ reps: defaultReps, weight: defaultWeight }));
-    }
-
-    // Get the most recent completed sets for this exercise
-    const lastSession = relevantSessions[0];
-    const lastExercise = lastSession.exercises.find(e => e.exerciseId === exerciseId);
-    if (!lastExercise || lastExercise.sets.length === 0) {
-      return Array.from({ length: numSets }, () => ({ reps: defaultReps, weight: defaultWeight }));
-    }
-
-    // Exclude warm-up sets from suggestions
-    const completedSets = lastExercise.sets.filter(s => s.completed && !s.isWarmup);
-    if (completedSets.length === 0) {
-      return Array.from({ length: numSets }, () => ({ reps: defaultReps, weight: defaultWeight }));
-    }
-
-    // Calculate progression: if all non-warmup sets completed, suggest small increase
-    const allCompleted = lastExercise.sets.filter(s => !s.isWarmup).every(s => s.completed);
-    const avgWeight = completedSets.reduce((sum, s) => sum + s.weight, 0) / completedSets.length;
-    const avgReps = completedSets.reduce((sum, s) => sum + s.reps, 0) / completedSets.length;
-
-    // Progressive overload: if all sets completed last time, add 2.5kg.
-    // Bodyweight exercises (avgWeight === 0) keep weight at 0 and suggest +1 rep.
-    const isBodyweight = avgWeight === 0;
-    const suggestedWeight = allCompleted && !isBodyweight ? Math.round((avgWeight + 2.5) * 2) / 2 : avgWeight;
-    const suggestedReps = allCompleted && isBodyweight ? Math.round(avgReps) + 1 : Math.round(avgReps);
-
-    return Array.from({ length: numSets }, (_, i) => {
-      if (i < completedSets.length) {
-        return { reps: completedSets[i].reps, weight: allCompleted ? suggestedWeight : completedSets[i].weight };
-      }
-      return { reps: suggestedReps, weight: suggestedWeight };
-    });
+    return progressiveOverload(sessions, exerciseId, numSets, defaultReps, defaultWeight);
   }, [getSessions]);
 
-  // Physical profile management
   const updatePhysicalProfile = useCallback((profile: PhysicalProfile) => {
-    if (!currentUser) return;
-    setAppData(prev => {
-      const user = prev.users[currentUser];
+    persistUser((prev, username) => {
+      const user = prev.users[username];
       if (!user) return prev;
       return {
         ...prev,
-        users: { ...prev.users, [currentUser]: { ...user, physicalProfile: profile } },
+        users: { ...prev.users, [username]: { ...user, physicalProfile: profile } },
       };
     });
-  }, [currentUser]);
+    markDirty();
+  }, [markDirty, persistUser]);
 
   const getPhysicalProfile = useCallback((): PhysicalProfile | null => {
-    const profile = getProfile();
-    return profile?.physicalProfile || null;
+    return getProfile()?.physicalProfile || null;
   }, [getProfile]);
 
-  // Custom exercises management
   const getCustomExercises = useCallback((): Exercise[] => {
-    const profile = getProfile();
-    return profile?.customExercises || [];
+    return getProfile()?.customExercises || [];
   }, [getProfile]);
 
   const getAllExercises = useCallback((): Exercise[] => {
     const custom = getCustomExercises();
-    // Merge custom exercises over defaults: a custom exercise sharing an id with a
-    // default one (e.g. an edited default with a changed name/image) must REPLACE it,
-    // not be appended. Appending would leave a duplicate id and `.find()` callers
-    // (template editor, etc.) would resolve to the stale default instead of the edit.
     const merged = [...EXERCISES];
-    custom.forEach(c => {
-      const idx = merged.findIndex(e => e.id === c.id);
+    custom.forEach((c) => {
+      const idx = merged.findIndex((e) => e.id === c.id);
       if (idx >= 0) merged[idx] = c;
       else merged.push(c);
     });
@@ -397,397 +455,336 @@ export function useStorage() {
   }, [getCustomExercises]);
 
   const saveExercise = useCallback((exercise: Exercise) => {
-    if (!currentUser) return;
-    setAppData(prev => {
-      const user = prev.users[currentUser];
+    persistUser((prev, username) => {
+      const user = prev.users[username];
       if (!user) return prev;
-      const existing = user.customExercises || [];
-      const idx = existing.findIndex(e => e.id === exercise.id);
-      
-      // Check if it's a default exercise being edited
-      const defaultExercise = EXERCISES.find(e => e.id === exercise.id);
-      if (defaultExercise) {
-        // Add as custom override
-        const customExercise = { ...exercise, isCustom: true, id: `custom-${exercise.id}-${generateId()}` };
-        return {
-          ...prev,
-          users: { ...prev.users, [currentUser]: { ...user, customExercises: [...existing, customExercise] } },
-        };
-      }
-      
+      const list = user.customExercises || [];
+      const idx = list.findIndex((e) => e.id === exercise.id);
       const updated = idx >= 0
-        ? existing.map(e => e.id === exercise.id ? exercise : e)
-        : [...existing, { ...exercise, isCustom: true }];
+        ? list.map((e) => (e.id === exercise.id ? exercise : e))
+        : [...list, { ...exercise, isCustom: true }];
       return {
         ...prev,
-        users: { ...prev.users, [currentUser]: { ...user, customExercises: updated } },
+        users: { ...prev.users, [username]: { ...user, customExercises: updated } },
       };
     });
-  }, [currentUser]);
+    markDirty();
+  }, [markDirty, persistUser]);
 
   const updateExercise = useCallback((exerciseId: string, updates: Partial<Exercise>) => {
-    if (!currentUser) return;
-    setAppData(prev => {
-      const user = prev.users[currentUser];
+    persistUser((prev, username) => {
+      const user = prev.users[username];
       if (!user) return prev;
-      const customExercises = user.customExercises || [];
-      
-      // Check if it's a custom exercise
-      const customIdx = customExercises.findIndex(e => e.id === exerciseId);
-      if (customIdx >= 0) {
-        const updated = customExercises.map(e => e.id === exerciseId ? { ...e, ...updates } : e);
+      const list = user.customExercises || [];
+      const idx = list.findIndex((e) => e.id === exerciseId);
+      if (idx >= 0) {
+        const updated = list.map((e) => (e.id === exerciseId ? { ...e, ...updates } : e));
         return {
           ...prev,
-          users: { ...prev.users, [currentUser]: { ...user, customExercises: updated } },
+          users: { ...prev.users, [username]: { ...user, customExercises: updated } },
         };
       }
-      
-      // It's a default exercise - create a modified copy
-      const defaultExercise = EXERCISES.find(e => e.id === exerciseId);
-      if (defaultExercise) {
-        const modifiedExercise: Exercise = { 
-          ...defaultExercise, 
-          ...updates, 
-          id: exerciseId, // Keep same ID so references work
-          isCustom: true 
-        };
+      const defaults = EXERCISES.find((e) => e.id === exerciseId);
+      if (defaults) {
+        const modified: Exercise = { ...defaults, ...updates, id: exerciseId, isCustom: true };
         return {
           ...prev,
-          users: { ...prev.users, [currentUser]: { ...user, customExercises: [...customExercises, modifiedExercise] } },
+          users: {
+            ...prev.users,
+            [username]: { ...user, customExercises: [...list, modified] },
+          },
         };
       }
-      
       return prev;
     });
-  }, [currentUser]);
+    markDirty();
+  }, [markDirty, persistUser]);
 
   const deleteExercise = useCallback((exerciseId: string) => {
-    if (!currentUser) return;
-    setAppData(prev => {
-      const user = prev.users[currentUser];
+    persistUser((prev, username) => {
+      const user = prev.users[username];
       if (!user) return prev;
-      const isCustom = (user.customExercises || []).some(e => e.id === exerciseId);
+      const list = user.customExercises || [];
+      const isCustom = list.some((e) => e.id === exerciseId);
       if (isCustom) {
-        // Remove fully — only affects this user's custom exercises
         return {
           ...prev,
           users: {
             ...prev.users,
-            [currentUser]: {
+            [username]: {
               ...user,
-              customExercises: (user.customExercises || []).filter(e => e.id !== exerciseId),
-            },
-          },
-        };
-      } else {
-        // Default exercise: add to hidden list for this user only
-        const hidden = user.hiddenExerciseIds || [];
-        if (hidden.includes(exerciseId)) return prev; // already hidden
-        return {
-          ...prev,
-          users: {
-            ...prev.users,
-            [currentUser]: {
-              ...user,
-              hiddenExerciseIds: [...hidden, exerciseId],
+              customExercises: list.filter((e) => e.id !== exerciseId),
             },
           },
         };
       }
+      const hidden = user.hiddenExerciseIds || [];
+      if (hidden.includes(exerciseId)) return prev;
+      return {
+        ...prev,
+        users: {
+          ...prev.users,
+          [username]: {
+            ...user,
+            hiddenExerciseIds: [...hidden, exerciseId],
+          },
+        },
+      };
     });
-  }, [currentUser]);
+    markDirty();
+  }, [markDirty, persistUser]);
 
   const unhideExercise = useCallback((exerciseId: string) => {
-    if (!currentUser) return;
-    setAppData(prev => {
-      const user = prev.users[currentUser];
+    persistUser((prev, username) => {
+      const user = prev.users[username];
       if (!user) return prev;
       return {
         ...prev,
         users: {
           ...prev.users,
-          [currentUser]: {
+          [username]: {
             ...user,
-            hiddenExerciseIds: (user.hiddenExerciseIds || []).filter(id => id !== exerciseId),
+            hiddenExerciseIds: (user.hiddenExerciseIds || []).filter((id) => id !== exerciseId),
           },
         },
       };
     });
-  }, [currentUser]);
+    markDirty();
+  }, [markDirty, persistUser]);
 
   const getHiddenExerciseIds = useCallback((): string[] => {
-    const profile = getProfile();
-    return profile?.hiddenExerciseIds || [];
+    return getProfile()?.hiddenExerciseIds || [];
   }, [getProfile]);
 
-  // Cardio sessions management
   const getCardioSessions = useCallback((): CardioSession[] => {
     if (!currentUser) return [];
-    return appData.cardioSessions[currentUser] || [];
+    return appData.cardioSessions?.[currentUser] || [];
   }, [appData, currentUser]);
 
   const saveCardioSession = useCallback((session: CardioSession) => {
-    if (!currentUser) return;
-    setAppData(prev => {
-      const userSessions = (prev.cardioSessions || {})[currentUser] || [];
-      const idx = userSessions.findIndex(s => s.id === session.id);
+    persistUser((prev, username) => {
+      const list = prev.cardioSessions?.[username] || [];
+      const idx = list.findIndex((s) => s.id === session.id);
       const updated = idx >= 0
-        ? userSessions.map(s => s.id === session.id ? session : s)
-        : [...userSessions, session];
+        ? list.map((s) => (s.id === session.id ? session : s))
+        : [...list, session];
       return {
         ...prev,
-        cardioSessions: { ...(prev.cardioSessions || {}), [currentUser]: updated },
+        cardioSessions: { ...(prev.cardioSessions || {}), [username]: updated },
       };
     });
-  }, [currentUser]);
+    markDirty();
+  }, [markDirty, persistUser]);
 
   const deleteCardioSession = useCallback((sessionId: string) => {
-    if (!currentUser) return;
-    setAppData(prev => {
-      const userSessions = (prev.cardioSessions || {})[currentUser] || [];
+    persistUser((prev, username) => {
+      const list = prev.cardioSessions?.[username] || [];
       return {
         ...prev,
-        cardioSessions: { ...prev.cardioSessions, [currentUser]: userSessions.filter(s => s.id !== sessionId) },
+        cardioSessions: {
+          ...(prev.cardioSessions || {}),
+          [username]: list.filter((s) => s.id !== sessionId),
+        },
       };
     });
-  }, [currentUser]);
+    markDirty();
+  }, [markDirty, persistUser]);
 
-  // Calorie estimation for strength training
-  const estimateWorkoutCalories = useCallback((session: WorkoutSession): number => {
-    const profile = getPhysicalProfile();
-    if (!profile) {
-      // Default estimation without profile
-      const totalSets = session.exercises.reduce((sum, ex) => sum + ex.sets.filter(s => s.completed).length, 0);
-      return Math.round(totalSets * 8); // ~8 cal per set as rough estimate
-    }
-
-    const { weight, age, sex } = profile;
-    const durationMinutes = session.durationMinutes || 45;
-    
-    // MET for weight training is typically 3-6, we use 5 for moderate intensity
-    const MET = 5;
-    
-    // Mifflin-St Jeor for BMR estimation
-    let bmr: number;
-    if (sex === 'male') {
-      bmr = 10 * weight + 6.25 * (profile.height || 175) - 5 * age + 5;
-    } else {
-      bmr = 10 * weight + 6.25 * (profile.height || 165) - 5 * age - 161;
-    }
-    
-    // Calories burned = MET * weight * duration(hours)
-    // BMR is used to validate the calculation makes sense
-    const caloriesBurned = MET * weight * (durationMinutes / 60);
-    
-    // Ensure we don't estimate more than physiologically possible
-    const maxPossible = (bmr / 24) * (durationMinutes / 60) * MET;
-    void maxPossible; // Used for validation if needed
-    
-    return Math.round(caloriesBurned);
+  const estimateWorkoutCalories = useCallback((session: WorkoutSession) => {
+    return estimateStrengthCalories(session, getPhysicalProfile());
   }, [getPhysicalProfile]);
 
-  // Calorie estimation for cardio
-  const estimateCardioCalories = useCallback((cardioTypeId: string, durationMinutes: number, avgHeartRate: number): number => {
-    const profile = getPhysicalProfile();
-    
-    // MET values for different cardio types
-    const metValues: Record<string, number> = {
-      running: 9.8,
-      cycling: 7.5,
-      swimming: 8.0,
-      rowing: 7.0,
-      elliptical: 5.0,
-      walking: 3.5,
-      hiit: 12.0,
-      stairmaster: 9.0,
-      jumping_rope: 11.0,
-    };
-    
-    const baseMET = metValues[cardioTypeId] || 6.0;
-    
-    if (!profile) {
-      // Simplified calculation without profile (assume 70kg)
-      return Math.round(baseMET * 70 * (durationMinutes / 60));
-    }
-    
-    const { weight, age, sex, maxHeartRate, restingHeartRate } = profile;
-    
-    // Heart rate based calorie calculation (more accurate)
-    // Using the formula that accounts for heart rate
-    if (avgHeartRate > 0 && maxHeartRate > 0) {
-      const hrReserve = maxHeartRate - restingHeartRate;
-      if (hrReserve > 0) {
-        const intensity = Math.max(0, Math.min(1, (avgHeartRate - restingHeartRate) / hrReserve));
-        
-        // Adjust MET based on heart rate intensity
-        const adjustedMET = baseMET * (0.5 + intensity);
-        
-        let calories: number;
-        if (sex === 'male') {
-          calories = ((-55.0969 + (0.6309 * avgHeartRate) + (0.1988 * weight) + (0.2017 * age)) / 4.184) * durationMinutes;
-        } else {
-          calories = ((-20.4022 + (0.4472 * avgHeartRate) - (0.1263 * weight) + (0.074 * age)) / 4.184) * durationMinutes;
-        }
-        
-        // Use the higher of heart rate formula or MET-based calculation
-        const metCalories = adjustedMET * weight * (durationMinutes / 60);
-        return Math.round(Math.max(calories, metCalories));
-      }
-    }
-    
-    // MET-based calculation
-    return Math.round(baseMET * weight * (durationMinutes / 60));
-  }, [getPhysicalProfile]);
+  const estimateCardioCaloriesCb = useCallback(
+    (cardioTypeId: string, durationMinutes: number, avgHeartRate: number) => {
+      return estimateCardioCalories(cardioTypeId, durationMinutes, avgHeartRate, getPhysicalProfile());
+    },
+    [getPhysicalProfile],
+  );
 
-  // Export all user data as JSON
   const exportUserData = useCallback(() => {
     if (!currentUser) return;
-
     const profile = getProfile();
     const sessions = getSessions();
     const cardioSessionsData = getCardioSessions();
     const customExercisesData = getCustomExercises();
-
     const exportData = {
       version: 1,
       exportDate: new Date().toISOString(),
       username: currentUser,
-      profile: profile,
-      sessions: sessions,
+      profile,
+      sessions,
       cardioSessions: cardioSessionsData,
       customExercises: customExercisesData,
+      customTemplates: profile?.customTemplates || [],
     };
-
-    const jsonString = JSON.stringify(exportData, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-
     const a = document.createElement('a');
     a.href = url;
-    a.download = `gymtracker_${currentUser}_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `gymtracker-${currentUser}-${new Date().toISOString().split('T')[0]}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [currentUser, getProfile, getSessions, getCardioSessions, getCustomExercises]);
+  }, [currentUser, getCardioSessions, getCustomExercises, getProfile, getSessions]);
 
-  // Download CSV template with dummy data for Excel
+  const importUserData = useCallback((jsonString: string): ImportResult => {
+    if (!currentUser) return { ok: false, error: 'invalid', message: 'No active user' };
+    try {
+      const parsed = JSON.parse(jsonString);
+      if (typeof parsed !== 'object' || parsed === null) {
+        return { ok: false, error: 'invalid', message: 'Invalid JSON' };
+      }
+      if (parsed.version !== 1) {
+        return { ok: false, error: 'invalid', message: 'Unsupported version' };
+      }
+      const incomingSessions = Array.isArray(parsed.sessions) ? parsed.sessions : [];
+      const incomingCardio = Array.isArray(parsed.cardioSessions) ? parsed.cardioSessions : [];
+      const incomingExercises = Array.isArray(parsed.customExercises) ? parsed.customExercises : [];
+      const incomingTemplates = Array.isArray(parsed.customTemplates) ? parsed.customTemplates : [];
+
+      const existingSessions = appData.sessions[currentUser] || [];
+      const existingCardio = appData.cardioSessions?.[currentUser] || [];
+      const profile = appData.users[currentUser];
+      const existingExercises = profile?.customExercises || [];
+      const existingTemplates = profile?.customTemplates || [];
+
+      const sessionIds = new Set(existingSessions.map((s) => s.id));
+      const cardioIds = new Set(existingCardio.map((s) => s.id));
+      const exerciseIds = new Set(existingExercises.map((e) => e.id));
+      const templateIds = new Set(existingTemplates.map((t) => t.id));
+
+      const newSessions = incomingSessions.filter((s: WorkoutSession) => s?.id && !sessionIds.has(s.id));
+      const newCardio = incomingCardio.filter((s: CardioSession) => s?.id && !cardioIds.has(s.id));
+      const newExercises = incomingExercises.filter((e: Exercise) => e?.id && !exerciseIds.has(e.id));
+      const newTemplates = incomingTemplates.filter((t: WorkoutTemplate) => t?.id && !templateIds.has(t.id));
+
+      const user = profile;
+      const updated: AppData = {
+        ...appData,
+        sessions: {
+          ...appData.sessions,
+          [currentUser]: [...existingSessions, ...newSessions],
+        },
+        cardioSessions: {
+          ...(appData.cardioSessions || {}),
+          [currentUser]: [...existingCardio, ...newCardio],
+        },
+        users: user ? {
+          ...appData.users,
+          [currentUser]: {
+            ...user,
+            customExercises: [...existingExercises, ...newExercises],
+            customTemplates: [...existingTemplates, ...newTemplates],
+            physicalProfile: user.physicalProfile || parsed.profile?.physicalProfile,
+          },
+        } : appData.users,
+      };
+      persist(updated);
+      markDirty();
+      return {
+        ok: true,
+        added: {
+          sessions: newSessions.length,
+          cardio: newCardio.length,
+          exercises: newExercises.length,
+          templates: newTemplates.length,
+        },
+      };
+    } catch (err) {
+      return { ok: false, error: 'invalid', message: err instanceof Error ? err.message : 'Parse error' };
+    }
+  }, [appData, currentUser, markDirty, persist]);
+
   const downloadTemplate = useCallback(() => {
-    const csvContent = `date,type,exercise_name,sets,reps,weight,notes
-2025-01-15,Push,Bench Press,4,8,85,"Buen entrenamiento de pecho"
-2025-01-15,Push,Overhead Press,3,10,60,""
-2025-01-17,Pull,Deadlift,4,6,120,""
-2025-01-17,Pull,Pull-ups,3,8,0,"Usa peso asistido si es necesario"`;
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const csv = `date,type,exercise_name,sets,reps,weight,notes
+2025-01-15,Push,Bench Press,4,8,85,"Buen entrenamiento"
+2025-01-17,Pull,Deadlift,4,6,120,""`;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'gymtracker_plantilla_importar.csv';
+    a.download = 'gymtracker-template.csv';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }, []);
 
-  // Download list of all exercise names to help with import matching
   const downloadExerciseNames = useCallback(() => {
     const allEx = getAllExercises();
-    const exerciseList = allEx.map(ex => ex.name).join('\n');
-
-    const blob = new Blob([`NOMBRE_EJERCICIO\n${exerciseList}`], { type: 'text/csv;charset=utf-8;' });
+    const csv = 'exercise_name\n' + allEx.map((ex) => ex.name).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'gymtracker_nombres_ejercicios.csv';
+    a.download = 'gymtracker-exercises.csv';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }, [getAllExercises]);
 
-  // Import user data from JSON
-  const importUserData = useCallback((jsonString: string): boolean => {
-    if (!currentUser) return false;
-    
-    try {
-      const importData = JSON.parse(jsonString);
-      
-      // Validate structure
-      if (!importData.version || !importData.sessions) {
-        return false;
-      }
-      
-      setAppData(prev => {
-        const user = prev.users[currentUser];
-        if (!user) return prev;
-        
-        // Merge imported data
-        const existingSessionIds = new Set((prev.sessions[currentUser] || []).map(s => s.id));
-        const newSessions = (importData.sessions || []).filter((s: WorkoutSession) => !existingSessionIds.has(s.id));
-        
-        const existingCardioIds = new Set(((prev.cardioSessions || {})[currentUser] || []).map(s => s.id));
-        const newCardio = (importData.cardioSessions || []).filter((s: CardioSession) => !existingCardioIds.has(s.id));
-        
-        const existingExerciseIds = new Set((user.customExercises || []).map(e => e.id));
-        const newExercises = (importData.customExercises || []).filter((e: Exercise) => !existingExerciseIds.has(e.id));
-        
-        // Merge custom templates by id (same policy as sessions/exercises).
-        const existingTemplateIds = new Set((user.customTemplates || []).map(t => t.id));
-        const newTemplates = (importData.profile?.customTemplates || []).filter(
-          (t: WorkoutTemplate) => !existingTemplateIds.has(t.id)
-        );
-        const mergedTemplates = [...(user.customTemplates || []), ...newTemplates];
-        
-        // Profile/weekly plan: only take imported value when local is missing,
-        // so an existing user does not lose their current configuration.
-        const importedProfile = importData.profile;
-        const hasWeeklyPlan = user.weeklyPlan && user.weeklyPlan.days && user.weeklyPlan.days.length > 0;
-        
-        const updatedUser = {
-          ...user,
-          physicalProfile: user.physicalProfile || importedProfile?.physicalProfile,
-          customExercises: [...(user.customExercises || []), ...newExercises],
-          customTemplates: mergedTemplates,
-          weeklyPlan: hasWeeklyPlan ? user.weeklyPlan : (importedProfile?.weeklyPlan || user.weeklyPlan),
-        };
-        
-        return {
-          ...prev,
-          users: { ...prev.users, [currentUser]: updatedUser },
-          sessions: { 
-            ...prev.sessions, 
-            [currentUser]: [...(prev.sessions[currentUser] || []), ...newSessions] 
-          },
-          cardioSessions: {
-            ...(prev.cardioSessions || {}),
-            [currentUser]: [...((prev.cardioSessions || {})[currentUser] || []), ...newCardio]
-          },
-        };
-      });
-      
-      return true;
-    } catch {
-      return false;
+  const updateUserPreferences = useCallback((prefs: Partial<NonNullable<UserProfile['preferences']>>) => {
+    persistUser((prev, username) => {
+      const user = prev.users[username];
+      if (!user) return prev;
+      return {
+        ...prev,
+        users: {
+          ...prev.users,
+          [username]: { ...user, preferences: { ...user.preferences, ...prefs } },
+        },
+      };
+    });
+    markDirty();
+  }, [markDirty, persistUser]);
+
+  const resolveConflict = useCallback(async (strategy: 'local' | 'remote' | 'merge') => {
+    if (!syncConflict || !currentUser) return;
+    const engine = engineRef.current;
+    if (!engine) return;
+    if (strategy === 'remote' && syncConflict.serverData) {
+      setAppData((prev) => mergeServerData(prev, currentUser, syncConflict.serverData!));
+      setSyncConflict(null);
+      await engine.refreshFromNetwork();
+      return;
     }
-  }, [currentUser]);
+    if (strategy === 'merge' && syncConflict.serverData) {
+      setAppData((prev) => mergeServerData(prev, currentUser, syncConflict.serverData!));
+    }
+    setSyncConflict(null);
+    engine.markDirty();
+  }, [currentUser, syncConflict]);
+
+  const forceSyncNow = useCallback(async () => {
+    await engineRef.current?.refreshFromNetwork();
+  }, []);
 
   return {
+    appData,
     currentUser,
+    currentUserId: currentUser,
     login,
+    register,
     logout,
+    switchUser,
+    knownUsers,
+    removeKnownUser,
+    syncStatus,
+    syncConflict,
+    resolveConflict,
+    forceSyncNow,
     getProfile,
     getSessions,
     saveSession,
     deleteSession,
+    duplicateSession,
     updateWeeklyPlan,
     saveTemplate,
     deleteTemplate,
     getAllTemplates,
     getSuggestedSets,
-    // New functions
     updatePhysicalProfile,
     getPhysicalProfile,
     getCustomExercises,
@@ -801,14 +798,24 @@ export function useStorage() {
     saveCardioSession,
     deleteCardioSession,
     estimateWorkoutCalories,
-    estimateCardioCalories,
-    // Export/Import
+    estimateCardioCalories: estimateCardioCaloriesCb,
     exportUserData,
     importUserData,
     downloadTemplate,
     downloadExerciseNames,
-    // Sync info
-    serverOn,
-    syncStatus,
+    updateUserPreferences,
+  };
+}
+
+function createInitialProfile(username: string): UserProfile {
+  return {
+    userId: normalizeUsernameKey(username),
+    username,
+    createdAt: new Date().toISOString(),
+    weeklyPlan: { daysPerWeek: 3, days: [] },
+    customTemplates: [],
+    customExercises: [],
+    hiddenExerciseIds: [],
+    preferences: {},
   };
 }

@@ -1,157 +1,245 @@
 @import "tailwindcss";
 
-* {
-  -webkit-tap-highlight-color: transparent;
+@custom-variant dark (&:where(.theme-dark, .theme-dark *));
+@custom-variant light (&:where(.theme-light, .theme-light *));
+@custom-variant black (&:where(.theme-black, .theme-black *));
+@custom-variant contrast (&:where(.theme-contrast, .theme-contrast *));
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    --canvas: #0b0f17;
+    --surface-1: #111827;
+    --surface-2: #182132;
+    --surface-3: #202b3d;
+    --surface-elevated: #1a2333;
+
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --text-disabled: #64748b;
+    --text-on-accent: #ffffff;
+
+    --brand: #ff7a1a;
+    --brand-strong: #e85d04;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --info: #38bdf8;
+
+    --border-subtle: rgb(255 255 255 / 0.08);
+    --border-strong: rgb(255 255 255 / 0.18);
+
+    --glass-bg: rgb(17 24 39 / 0.68);
+    --glass-bg-strong: rgb(17 24 39 / 0.82);
+    --glass-border: rgb(255 255 255 / 0.12);
+    --glass-highlight: rgb(255 255 255 / 0.06);
+
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.25);
+    --shadow-float: 0 12px 40px rgb(0 0 0 / 0.38), inset 0 1px 0 rgb(255 255 255 / 0.06);
+
+    --focus-ring: #fbbf24;
+    --focus-ring-shadow: 0 0 0 3px rgb(251 191 36 / 0.35);
+
+    --radius-input: 12px;
+    --radius-card: 16px;
+    --radius-dialog: 20px;
+
+    --header-h: 56px;
+    --bottom-nav-h: 64px;
+  }
+
+  html.theme-light {
+    color-scheme: light;
+    --canvas: #f8fafc;
+    --surface-1: #ffffff;
+    --surface-2: #f1f5f9;
+    --surface-3: #e2e8f0;
+    --surface-elevated: #ffffff;
+
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    --text-disabled: #94a3b8;
+    --text-on-accent: #ffffff;
+
+    --border-subtle: rgb(15 23 42 / 0.08);
+    --border-strong: rgb(15 23 42 / 0.18);
+
+    --glass-bg: rgb(255 255 255 / 0.72);
+    --glass-bg-strong: rgb(255 255 255 / 0.86);
+    --glass-border: rgb(15 23 42 / 0.12);
+    --glass-highlight: rgb(255 255 255 / 0.6);
+  }
+
+  html.theme-black {
+    color-scheme: dark;
+    --canvas: #000000;
+    --surface-1: #0a0a0a;
+    --surface-2: #141414;
+    --surface-3: #1a1a1a;
+  }
+
+  html.theme-contrast {
+    color-scheme: dark;
+    --canvas: #0d0d18;
+    --surface-1: #1a1a2e;
+    --surface-2: #252540;
+    --surface-3: #353560;
+    --text-primary: #ffffff;
+    --text-secondary: #f1f5f9;
+    --brand: #ff8800;
+    --success: #00ff88;
+    --danger: #ff1144;
+    --info: #00d4ff;
+  }
 }
 
-html, body, #root {
-  height: 100%;
-  margin: 0;
-  padding: 0;
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: var(--canvas);
+    color: var(--text-primary);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    font-feature-settings: "cv11", "ss01", "ss03";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  :focus { outline: none; }
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  [role="button"]:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    box-shadow: var(--focus-ring-shadow);
+    outline: none;
+  }
 }
 
-/* ==========================
-   THEMES (override Tailwind CSS variables)
-   ========================== */
+@layer utilities {
+  .glass {
+    background-color: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-float);
+  }
 
-/* DARK (default) — matches the original look */
-html.theme-dark, html.theme-dark body, html.theme-dark #root {
-  background-color: #111827;
-  color: #f3f4f6;
-}
+  @supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+    .glass {
+      background-color: var(--glass-bg);
+      -webkit-backdrop-filter: saturate(135%) blur(14px);
+      backdrop-filter: saturate(135%) blur(14px);
+      border: 1px solid var(--glass-border);
+    }
+    .glass-strong {
+      background-color: var(--glass-bg-strong);
+      -webkit-backdrop-filter: saturate(140%) blur(18px);
+      backdrop-filter: saturate(140%) blur(18px);
+      border: 1px solid var(--glass-border);
+    }
+  }
 
-/* BLACK — pure OLED black */
-html.theme-black {
-  --color-gray-900: #000000;
-  --color-gray-800: #0a0a0a;
-  --color-gray-700: #1a1a1a;
-  --color-gray-600: #2a2a2a;
-  --color-gray-500: #4a4a4a;
-  --color-gray-400: #8a8a8a;
-}
-html.theme-black, html.theme-black body, html.theme-black #root {
-  background-color: #000000;
-  color: #f3f4f6;
-}
+  @media (prefers-reduced-transparency: reduce) {
+    .glass,
+    .glass-strong {
+      background-color: var(--surface-1);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
 
-/* LIGHT — full bright theme. Invert grays so existing classes adapt. */
-html.theme-light {
-  --color-gray-900: #ffffff;
-  --color-gray-800: #f3f4f6;
-  --color-gray-700: #e5e7eb;
-  --color-gray-600: #d1d5db;
-  --color-gray-500: #6b7280;
-  --color-gray-400: #4b5563;
-  --color-gray-300: #374151;
-  --color-gray-200: #1f2937;
-  --color-gray-100: #111827;
-  --color-gray-50:  #030712;
-  --color-white:    #111827;
-}
-html.theme-light, html.theme-light body, html.theme-light #root {
-  background-color: #ffffff;
-  color: #111827;
-}
-/* Re-map text-white to dark in light theme */
-html.theme-light .text-white { color: #111827 !important; }
-/* Make borders subtler on light bg */
-html.theme-light [class*="border-gray-700"] { border-color: #e5e7eb !important; }
-html.theme-light [class*="border-gray-600"] { border-color: #d1d5db !important; }
+  .surface {
+    background-color: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-card);
+  }
 
-/* CONTRAST — vivid colors with deep dark base for higher contrast */
-html.theme-contrast {
-  --color-gray-900: #0d0d18;
-  --color-gray-800: #1a1a2e;
-  --color-gray-700: #252540;
-  --color-gray-600: #353560;
-  --color-orange-400: #ff8800;
-  --color-orange-500: #ff6a00;
-  --color-orange-600: #ff5500;
-  --color-green-400: #00ff88;
-  --color-green-500: #00e676;
-  --color-blue-400:  #00d4ff;
-  --color-blue-500:  #00aaff;
-  --color-red-400:   #ff3366;
-  --color-red-500:   #ff1144;
-  --color-purple-400: #c466ff;
-  --color-yellow-400: #ffea00;
-}
-html.theme-contrast, html.theme-contrast body, html.theme-contrast #root {
-  background-color: #0d0d18;
-  color: #ffffff;
-}
+  .surface-2 {
+    background-color: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-card);
+  }
 
-/* Hide scrollbar but keep scroll */
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
+  .text-primary { color: var(--text-primary); }
+  .text-secondary { color: var(--text-secondary); }
+  .text-muted { color: var(--text-muted); }
+  .text-disabled { color: var(--text-disabled); }
+  .text-on-accent { color: var(--text-on-accent); }
+  .text-brand { color: var(--brand); }
 
-/* Custom scrollbar for main content */
-::-webkit-scrollbar {
-  width: 4px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #374151;
-  border-radius: 2px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #4b5563;
+  .bg-canvas { background-color: var(--canvas); }
+  .bg-surface-1 { background-color: var(--surface-1); }
+  .bg-surface-2 { background-color: var(--surface-2); }
+  .bg-surface-3 { background-color: var(--surface-3); }
+
+  .border-app { border-color: var(--border-subtle); }
+  .border-app-strong { border-color: var(--border-strong); }
+
+  .safe-top { padding-top: env(safe-area-inset-top, 0px); }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+
+  @keyframes slide-up {
+    from { transform: translateY(8px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .animate-slide-up { animation: slide-up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .animate-fade-in { animation: fade-in 0.2s ease-out; }
 }
 
-/* Safe area for mobile bottom nav */
-.safe-area-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
-/* Number input no arrows */
 input[type='number']::-webkit-inner-spin-button,
 input[type='number']::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
-input[type='number'] {
-  -moz-appearance: textfield;
-}
+input[type='number'] { -moz-appearance: textfield; }
 
-/* Hide scrollbar utility */
-.hide-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
-}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
 
-/* Slide up animation for wheel picker */
-@keyframes slide-up {
-  from {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.animate-slide-up {
-  animation: slide-up 0.3s ease-out;
-}
-
-/* Leaflet map container — ensure proper height */
 .leaflet-container {
   width: 100%;
   height: 100%;
-  background: #1f2937;
+  background: var(--surface-2);
   z-index: 0;
-}
-html.theme-light .leaflet-container {
-  background: #e5e7eb;
 }

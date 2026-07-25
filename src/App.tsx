@@ -1,46 +1,63 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, Suspense, lazy } from 'react';
 import { useStorage } from './hooks/useStorage';
-import { ExercisesProvider } from './contexts/ExercisesContext';
-import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
+import { LanguageProvider } from './contexts/LanguageContext';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { ToastProvider } from './contexts/ToastContext';
 import LoginScreen from './components/LoginScreen';
 import HomeTab from './components/HomeTab';
 import HistoryTab from './components/HistoryTab';
 import TemplatesTab from './components/TemplatesTab';
 import ExercisesTab from './components/ExercisesTab';
 import ProfileTab from './components/ProfileTab';
+import Shell from './components/layout/Shell';
+import type { WorkoutSession } from './types';
 
 const StatsTab = lazy(() => import('./components/StatsTab'));
 const CardioTab = lazy(() => import('./components/CardioTab'));
-import WorkoutSessionView from './components/WorkoutSession';
-import { WorkoutSession } from './types';
-import { Home, History, BarChart2, Calendar, Dumbbell, User, Activity, LogOut } from 'lucide-react';
+const WorkoutSessionView = lazy(() => import('./components/WorkoutSession').then((m) => ({ default: m.default })));
 
-type Tab = 'home' | 'history' | 'stats' | 'templates' | 'exercises' | 'profile' | 'cardio';
+function LoadingShell({ message }: { message: string }) {
+  return (
+    <div className="grid min-h-dvh place-items-center bg-canvas text-muted">
+      {message}
+    </div>
+  );
+}
 
 export default function App() {
   return (
-    <LanguageProvider>
-      <AppInner />
-    </LanguageProvider>
+    <ThemeProvider>
+      <LanguageProvider>
+        <ToastProvider>
+          <BrowserRouter>
+            <AppInner />
+          </BrowserRouter>
+        </ToastProvider>
+      </LanguageProvider>
+    </ThemeProvider>
   );
 }
 
 function AppInner() {
-  const { t } = useLanguage();
+  const storage = useStorage();
   const {
     currentUser,
     login,
+    register,
     logout,
+    knownUsers,
+    removeKnownUser,
     getProfile,
     getSessions,
     saveSession,
     deleteSession,
+    duplicateSession,
     updateWeeklyPlan,
     saveTemplate,
     deleteTemplate,
     getAllTemplates,
     getSuggestedSets,
-    // New functions
     updatePhysicalProfile,
     getPhysicalProfile,
     getCustomExercises,
@@ -48,185 +65,91 @@ function AppInner() {
     saveExercise,
     updateExercise,
     deleteExercise,
-    getHiddenExerciseIds,
     getCardioSessions,
     saveCardioSession,
     deleteCardioSession,
     estimateWorkoutCalories,
     estimateCardioCalories,
-    // Export/Import
     exportUserData,
     importUserData,
     downloadTemplate,
     downloadExerciseNames,
-    serverOn,
     syncStatus,
-  } = useStorage();
+    syncConflict,
+    resolveConflict,
+    forceSyncNow,
+  } = storage;
 
-  const [activeTab, setActiveTab] = useState<Tab>('home');
   const [activeSession, setActiveSession] = useState<WorkoutSession | null>(null);
 
-  // Get all stored usernames for quick login
-  const storedData = localStorage.getItem('gymtracker_data');
-  let allUsers: string[] = [];
-  if (storedData) {
-    try {
-      allUsers = Object.keys(JSON.parse(storedData).users || {});
-    } catch {
-      allUsers = [];
-    }
-  }
-
   if (!currentUser) {
-    return <LoginScreen onLogin={(username, token) => login(username, token)} existingUsers={allUsers} />;
+    return (
+      <LoginScreen
+        onLogin={(username, token) => login(username, token)}
+        onRegister={(username, token) => register(username, token)}
+        knownUsers={knownUsers}
+        onRemoveUser={removeKnownUser}
+      />
+    );
   }
 
-  const profile = getProfile();
   const sessions = getSessions();
-  const templates = profile?.customTemplates || [];
-  const weeklyPlan = profile?.weeklyPlan || { daysPerWeek: 3, days: [] };
-  const allTemplates = getAllTemplates();
+  const cardioSessions = getCardioSessions();
+  const templates = getAllTemplates();
   const physicalProfile = getPhysicalProfile();
   const customExercises = getCustomExercises();
-  const allExercises = getAllExercises();
-  const hiddenExerciseIds = getHiddenExerciseIds();
-  const cardioSessions = getCardioSessions();
-
-  const handleStartSession = (session: WorkoutSession) => {
-    setActiveSession(session);
-  };
+  const profile = getProfile();
 
   const handleSaveSession = (session: WorkoutSession) => {
-    // Add calorie estimation to the session
     const calories = estimateWorkoutCalories(session);
-    const sessionWithCalories = { ...session, caloriesBurned: calories };
-    saveSession(sessionWithCalories);
+    saveSession({ ...session, caloriesBurned: calories });
   };
-
-  const handleCloseSession = () => {
-    setActiveSession(null);
-  };
-
-  const handleContinueSession = (session: WorkoutSession) => {
-    setActiveSession(session);
-    setActiveTab('home');
-  };
-
-  // Primary tabs (always visible)
-  const primaryTabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: 'home', label: t.nav.home, icon: <Home className="w-5 h-5" /> },
-    { id: 'history', label: t.nav.history, icon: <History className="w-5 h-5" /> },
-    { id: 'cardio', label: t.nav.cardio, icon: <Activity className="w-5 h-5" /> },
-    { id: 'stats', label: t.nav.stats, icon: <BarChart2 className="w-5 h-5" /> },
-    { id: 'profile', label: t.nav.profile, icon: <User className="w-5 h-5" /> },
-  ];
-
-  // Secondary tabs (accessible via profile or swipe)
-  const secondaryTabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: 'templates', label: t.nav.plan, icon: <Calendar className="w-5 h-5" /> },
-    { id: 'exercises', label: t.nav.exercises, icon: <Dumbbell className="w-5 h-5" /> },
-  ];
-
-  // Calculate header height based on secondary tabs visibility
-  const showSecondaryTabs = activeTab === 'profile' || activeTab === 'templates' || activeTab === 'exercises';
 
   return (
-    <ExercisesProvider customExercises={customExercises} hiddenExerciseIds={hiddenExerciseIds}>
-    <div className="h-screen bg-gray-900 max-w-lg mx-auto relative overflow-hidden">
-      {/* Fixed Header */}
-      <div className="fixed top-0 left-0 right-0 z-50 max-w-lg mx-auto">
-        <div className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
-              <Dumbbell className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-white font-bold">GymTracker</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {serverOn ? (
-              <span
-                className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                  syncStatus === 'synced'
-                    ? 'bg-green-900 text-green-300'
-                    : syncStatus === 'syncing'
-                    ? 'bg-yellow-900 text-yellow-300'
-                    : syncStatus === 'error'
-                    ? 'bg-red-900 text-red-300'
-                    : 'bg-gray-700 text-gray-400'
-                }`}
-              >
-                {syncStatus === 'syncing' ? t.general.loading.replace('...','') : syncStatus === 'synced' ? '☁ sync' : syncStatus === 'error' ? '⚠ sync' : '☁'}
-              </span>
-            ) : (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-700 text-gray-500">
-                {t.general.local}
-              </span>
-            )}
-            <span className="text-gray-400 text-sm">{currentUser}</span>
-            <button
-              onClick={logout}
-              className="p-1.5 text-gray-500 hover:text-white transition-colors"
-              title="Cerrar sesión"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Secondary tabs bar - shown when in profile */}
-        {showSecondaryTabs && (
-          <div className="bg-gray-800/95 backdrop-blur-sm border-b border-gray-700 px-2 py-1.5 flex gap-2 overflow-x-auto scrollbar-hide" style={{ touchAction: 'pan-x' }}>
-            {secondaryTabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                  activeTab === tab.id
-                    ? 'bg-orange-600 text-white'
-                    : 'bg-gray-700 text-gray-400 hover:text-white'
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Content area - with padding for fixed header and footer */}
-      <div
-        className="h-full overflow-y-auto"
-        style={{
-          paddingTop: showSecondaryTabs ? '100px' : '56px',
-          paddingBottom: '70px',
-          touchAction: 'pan-y', // prevent horizontal scroll strips from blocking vertical scroll
-        }}
-      >
-        <div className="min-h-full">
-           {activeTab === 'home' && (
-             <HomeTab
-               sessions={sessions}
-               weeklyPlan={weeklyPlan}
-               templates={allTemplates}
-               username={currentUser}
-               onStartSession={handleStartSession}
-               onContinueWorkout={handleContinueSession}
-               onEditSession={handleContinueSession}
-               onDeleteSession={deleteSession}
-               getSuggestedSets={getSuggestedSets}
-             />
-           )}
-          {activeTab === 'history' && (
+    <Shell
+      username={currentUser}
+      syncStatus={syncStatus}
+      syncConflict={syncConflict}
+      onResolveConflict={resolveConflict}
+      onForceSync={forceSyncNow}
+      onLogout={logout}
+    >
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <HomeTab
+              sessions={sessions}
+              weeklyPlan={profile?.weeklyPlan || { daysPerWeek: 3, days: [] }}
+              templates={templates}
+              username={currentUser}
+              onStartSession={setActiveSession}
+              onContinueWorkout={(s) => setActiveSession(s)}
+              onEditSession={(s) => setActiveSession(s)}
+              onDeleteSession={deleteSession}
+              getSuggestedSets={getSuggestedSets}
+            />
+          }
+        />
+        <Route
+          path="/history"
+          element={
             <HistoryTab
               sessions={sessions}
               cardioSessions={cardioSessions}
               onDelete={deleteSession}
-              onContinue={handleContinueSession}
+              onContinue={(s) => setActiveSession(s)}
+              onDuplicate={(id) => {
+                const copy = duplicateSession(id);
+                if (copy) setActiveSession(copy);
+              }}
             />
-          )}
-          {activeTab === 'cardio' && (
-            <Suspense fallback={<div className="p-8 text-center text-gray-400">Cargando cardio…</div>}>
+          }
+        />
+        <Route
+          path="/cardio"
+          element={
+            <Suspense fallback={<LoadingShell message="Cargando cardio…" />}>
               <CardioTab
                 cardioSessions={cardioSessions}
                 physicalProfile={physicalProfile}
@@ -235,81 +158,71 @@ function AppInner() {
                 estimateCalories={estimateCardioCalories}
               />
             </Suspense>
-          )}
-          {activeTab === 'stats' && (
-            <Suspense fallback={<div className="p-8 text-center text-gray-400">Cargando estadísticas…</div>}>
-              <StatsTab
-                sessions={sessions}
-                cardioSessions={cardioSessions}
-              />
+          }
+        />
+        <Route
+          path="/stats"
+          element={
+            <Suspense fallback={<LoadingShell message="Cargando estadísticas…" />}>
+              <StatsTab sessions={sessions} cardioSessions={cardioSessions} />
             </Suspense>
-          )}
-          {activeTab === 'templates' && (
+          }
+        />
+        <Route
+          path="/plan"
+          element={
             <TemplatesTab
               templates={templates}
-              weeklyPlan={weeklyPlan}
+              userCustomTemplates={profile?.customTemplates || []}
+              weeklyPlan={profile?.weeklyPlan || { daysPerWeek: 3, days: [] }}
               onSaveTemplate={saveTemplate}
               onDeleteTemplate={deleteTemplate}
               onUpdateWeeklyPlan={updateWeeklyPlan}
               getSuggestedSets={getSuggestedSets}
-              allExercises={allExercises}
+              allExercises={getAllExercises()}
             />
-          )}
-          {activeTab === 'exercises' && (
+          }
+        />
+        <Route
+          path="/exercises"
+          element={
             <ExercisesTab
               customExercises={customExercises}
               onSaveExercise={saveExercise}
               onUpdateExercise={updateExercise}
               onDeleteExercise={deleteExercise}
             />
-          )}
-          {activeTab === 'profile' && (
+          }
+        />
+        <Route
+          path="/profile"
+          element={
             <ProfileTab
               physicalProfile={physicalProfile}
               onSaveProfile={updatePhysicalProfile}
               username={currentUser}
               onLogout={logout}
               onExportData={exportUserData}
-              onImportData={importUserData}
+              onImportData={(json) => importUserData(json).ok}
               onDownloadTemplate={downloadTemplate}
               onDownloadExerciseNames={downloadExerciseNames}
             />
-          )}
-        </div>
-      </div>
-
-      {/* Fixed Bottom nav */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 max-w-lg mx-auto bg-gray-800 border-t border-gray-700 safe-area-bottom">
-        <div className="flex">
-          {primaryTabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors ${
-                activeTab === tab.id || 
-                (tab.id === 'profile' && (activeTab === 'templates' || activeTab === 'exercises'))
-                  ? 'text-orange-400'
-                  : 'text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              {tab.icon}
-              <span className="text-xs font-medium">{tab.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Workout Session overlay */}
-      {activeSession && (
-        <WorkoutSessionView
-          session={activeSession}
-          onSave={handleSaveSession}
-          onClose={handleCloseSession}
-          onDelete={deleteSession}
-          getSuggestedSets={getSuggestedSets}
+          }
         />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+
+      {activeSession && (
+        <Suspense fallback={<LoadingShell message="Cargando sesión…" />}>
+          <WorkoutSessionView
+            session={activeSession}
+            onSave={handleSaveSession}
+            onClose={() => setActiveSession(null)}
+            onDelete={deleteSession}
+            getSuggestedSets={getSuggestedSets}
+          />
+        </Suspense>
       )}
-    </div>
-    </ExercisesProvider>
+    </Shell>
   );
 }

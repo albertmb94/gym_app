@@ -1,9 +1,14 @@
 import { useState, useEffect } from 'react';
-import { PhysicalProfile } from '../types';
-import { User, Ruler, Weight, Heart, Activity, Calendar, Save, Check, Download, Upload, Palette, Globe, LogOut } from 'lucide-react';
+import type { PhysicalProfile } from '../types';
+import { User, Save, Check, Download, Upload, Palette, Globe, LogOut } from 'lucide-react';
 import NumberPicker from './NumberPicker';
 import { useTheme, THEMES } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { Field } from './ui/Field';
+import { Button } from './ui/Button';
+import { Card } from './ui/Card';
+import { bmi, maxHeartRateFromAge } from '../utils/metrics';
+import { cn } from '../utils/cn';
 
 interface ProfileTabProps {
   physicalProfile: PhysicalProfile | null;
@@ -15,6 +20,12 @@ interface ProfileTabProps {
   onDownloadTemplate: () => void;
   onDownloadExerciseNames: () => void;
 }
+
+const SEX_OPTIONS: Array<{ id: 'male' | 'female' | 'other'; labelKey: 'male' | 'female' | 'other' }> = [
+  { id: 'male', labelKey: 'male' },
+  { id: 'female', labelKey: 'female' },
+  { id: 'other', labelKey: 'other' },
+];
 
 export default function ProfileTab({
   physicalProfile,
@@ -50,21 +61,15 @@ export default function ProfileTab({
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const calculateBMI = () => {
-    const heightM = profile.height / 100;
-    return (profile.weight / (heightM * heightM)).toFixed(1);
-  };
-
-  const getBMICategory = (bmi: number) => {
-    if (bmi < 18.5) return { text: t.profile.underweight, color: 'text-yellow-400' };
-    if (bmi < 25) return { text: t.profile.normal, color: 'text-green-400' };
-    if (bmi < 30) return { text: t.profile.overweight, color: 'text-orange-400' };
+  const bmiValue = bmi(profile);
+  const bmiCategory = (() => {
+    if (bmiValue < 18.5) return { text: t.profile.underweight, color: 'text-amber-400' };
+    if (bmiValue < 25) return { text: t.profile.normal, color: 'text-emerald-400' };
+    if (bmiValue < 30) return { text: t.profile.overweight, color: 'text-orange-400' };
     return { text: t.profile.obese, color: 'text-red-400' };
-  };
+  })();
 
-  const suggestedMaxHR = Math.round(208 - 0.7 * profile.age);
-  const bmi = parseFloat(calculateBMI());
-  const bmiCategory = getBMICategory(bmi);
+  const suggestedMaxHR = maxHeartRateFromAge(profile.age);
 
   const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -90,211 +95,229 @@ export default function ProfileTab({
   };
 
   return (
-    <div className="p-4 pb-24 overflow-y-auto space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <User className="text-purple-400" />
-            {t.profile.account}
-          </h2>
-          <p className="text-gray-400 text-sm mt-0.5">{t.profile.loggedInAs}: <span className="text-white font-medium">{username}</span></p>
+    <div className="space-y-4">
+      <Card>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="flex items-center gap-2 text-2xl font-bold text-primary">
+              <User className="text-orange-300" aria-hidden="true" />
+              {t.profile.account}
+            </h1>
+            <p className="text-sm text-secondary">
+              {t.profile.loggedInAs}: <span className="font-semibold text-primary">{username}</span>
+            </p>
+          </div>
+          <Button variant="secondary" size="sm" onClick={onLogout} iconLeft={<LogOut className="h-4 w-4" />}>
+            {t.profile.logout}
+          </Button>
         </div>
-        <button
-          onClick={onLogout}
-          className="flex items-center gap-1.5 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors"
-        >
-          <LogOut size={14} /> {t.profile.logout}
-        </button>
-      </div>
+      </Card>
 
-      {/* Physical data */}
-      <div className="bg-gray-800 rounded-xl p-4">
-        <h3 className="font-semibold mb-4 flex items-center gap-2">
-          <Activity className="text-blue-400" size={20} />
-          {t.profile.physicalData}
-        </h3>
+      <Card title={t.profile.physicalData}>
+        <div className="grid gap-4">
+          <Field label={t.profile.height}>
+            <NumberPicker
+              value={profile.height}
+              min={120}
+              max={220}
+              step={1}
+              suffix=" cm"
+              color="blue"
+              onChange={(value) => setProfile({ ...profile, height: value })}
+            />
+          </Field>
+          <Field label={t.profile.weight}>
+            <NumberPicker
+              value={profile.weight}
+              min={30}
+              max={200}
+              step={0.5}
+              suffix=" kg"
+              color="purple"
+              onChange={(value) => setProfile({ ...profile, weight: value })}
+            />
+          </Field>
+          <Field label={t.profile.age}>
+            <NumberPicker
+              value={profile.age}
+              min={10}
+              max={100}
+              step={1}
+              suffix={language === 'es' ? ' años' : ' yrs'}
+              color="green"
+              onChange={(value) => setProfile({ ...profile, age: value })}
+            />
+          </Field>
+          <Field label={t.profile.sex}>
+            <div role="radiogroup" aria-label={t.profile.sex} className="grid grid-cols-3 gap-2">
+              {SEX_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={profile.sex === opt.id}
+                  onClick={() => setProfile({ ...profile, sex: opt.id })}
+                  className={cn(
+                    'rounded-2xl py-3 text-sm font-semibold transition-colors',
+                    profile.sex === opt.id
+                      ? opt.id === 'male'
+                        ? 'bg-blue-500 text-white'
+                        : opt.id === 'female'
+                          ? 'bg-pink-500 text-white'
+                          : 'bg-purple-500 text-white'
+                      : 'bg-surface-3 text-secondary hover:bg-surface-2',
+                  )}
+                >
+                  {t.profile[opt.labelKey]}
+                </button>
+              ))}
+            </div>
+          </Field>
+        </div>
+      </Card>
 
+      <Card
+        title={t.profile.restingHR}
+      >
+        <div className="grid gap-4">
+          <Field label={t.profile.restingHR}>
+            <NumberPicker
+              value={profile.restingHeartRate}
+              min={25}
+              max={100}
+              step={1}
+              suffix=" bpm"
+              color="red"
+              onChange={(value) => setProfile({ ...profile, restingHeartRate: value })}
+            />
+          </Field>
+          <Field label={t.profile.maxHR} description={t.profile.suggestedMaxHR}>
+            <NumberPicker
+              value={profile.maxHeartRate}
+              min={120}
+              max={220}
+              step={1}
+              suffix=" bpm"
+              color="orange"
+              onChange={(value) => setProfile({ ...profile, maxHeartRate: value })}
+            />
+            {profile.maxHeartRate !== suggestedMaxHR && (
+              <button
+                type="button"
+                onClick={() => setProfile({ ...profile, maxHeartRate: suggestedMaxHR })}
+                className="text-xs text-orange-300 underline-offset-2 hover:underline"
+              >
+                {language === 'es' ? 'Usar sugerida' : 'Use suggested'} ({suggestedMaxHR} bpm)
+              </button>
+            )}
+          </Field>
+        </div>
+      </Card>
+
+      <Card title={t.profile.bmi}>
+        <div className="flex items-baseline gap-3">
+          <span className="text-4xl font-bold text-primary">{bmiValue.toFixed(1)}</span>
+          <span className={cn('text-sm font-medium', bmiCategory.color)}>{bmiCategory.text}</span>
+        </div>
+        <p className="mt-1 text-xs text-muted">{t.profile.bmiNote}</p>
+      </Card>
+
+      <Button
+        onClick={handleSave}
+        variant={saved ? 'success' : 'primary'}
+        fullWidth
+        size="lg"
+        iconLeft={saved ? <Check className="h-5 w-5" /> : <Save className="h-5 w-5" />}
+      >
+        {saved ? t.profile.saved : t.profile.saveChanges}
+      </Button>
+
+      <Card title={t.profile.appearance}>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm text-gray-400 mb-2 flex items-center gap-1">
-              <Ruler size={14} /> {t.profile.height}
+            <label className="mb-2 flex items-center gap-2 text-sm font-medium text-secondary">
+              <Globe className="h-4 w-4" aria-hidden="true" />
+              {t.profile.language}
             </label>
-            <NumberPicker value={profile.height} min={120} max={220} step={1} suffix=" cm" color="blue" onChange={(value) => setProfile({ ...profile, height: value })} />
+            <div role="radiogroup" aria-label={t.profile.language} className="grid grid-cols-2 gap-2">
+              {[
+                { id: 'es', label: '🇪🇸 ' + t.profile.spanish },
+                { id: 'en', label: '🇬🇧 ' + t.profile.english },
+              ].map((lang) => (
+                <button
+                  key={lang.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={language === lang.id}
+                  onClick={() => setLanguage(lang.id as 'es' | 'en')}
+                  className={cn(
+                    'rounded-2xl py-2.5 text-sm font-semibold transition-colors',
+                    language === lang.id ? 'bg-orange-500 text-white' : 'bg-surface-3 text-secondary hover:bg-surface-2',
+                  )}
+                >
+                  {lang.label}
+                </button>
+              ))}
+            </div>
           </div>
-
           <div>
-            <label className="block text-sm text-gray-400 mb-2 flex items-center gap-1">
-              <Weight size={14} /> {t.profile.weight}
+            <label className="mb-2 flex items-center gap-2 text-sm font-medium text-secondary">
+              <Palette className="h-4 w-4" aria-hidden="true" />
+              {t.profile.theme}
             </label>
-            <NumberPicker value={profile.weight} min={30} max={200} step={0.5} suffix=" kg" color="purple" onChange={(value) => setProfile({ ...profile, weight: value })} />
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-400 mb-2 flex items-center gap-1">
-              <Calendar size={14} /> {t.profile.age}
-            </label>
-            <NumberPicker value={profile.age} min={10} max={100} step={1} suffix={language === 'es' ? ' años' : ' yrs'} color="green" onChange={(value) => setProfile({ ...profile, age: value })} />
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">{t.profile.sex}</label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setProfile({ ...profile, sex: 'male' })}
-                className={`flex-1 py-3 rounded-xl font-medium transition-all ${profile.sex === 'male' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}
-              >
-                👨 {t.profile.male}
-              </button>
-              <button
-                onClick={() => setProfile({ ...profile, sex: 'female' })}
-                className={`flex-1 py-3 rounded-xl font-medium transition-all ${profile.sex === 'female' ? 'bg-pink-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}
-              >
-                👩 {t.profile.female}
-              </button>
+            <div role="radiogroup" aria-label={t.profile.theme} className="grid grid-cols-2 gap-2">
+              {THEMES.map((th) => (
+                <button
+                  key={th.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={theme === th.id}
+                  onClick={() => setTheme(th.id)}
+                  className={cn(
+                    'rounded-2xl border p-3 text-left transition-colors',
+                    theme === th.id ? 'border-orange-500 bg-surface-2' : 'border-app bg-surface-2 hover:bg-surface-3',
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl" aria-hidden="true">{th.emoji}</span>
+                    <span className="text-sm font-semibold text-primary">{th.name}</span>
+                    {theme === th.id && <Check className="ml-auto h-4 w-4 text-orange-300" aria-hidden="true" />}
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Heart rate */}
-      <div className="bg-gray-800 rounded-xl p-4">
-        <h3 className="font-semibold mb-4 flex items-center gap-2">
-          <Heart className="text-red-400" size={20} />
-          {t.profile.restingHR.replace(' (ppm)', '').replace(' (bpm)', '')}
-        </h3>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">{t.profile.restingHR}</label>
-            <NumberPicker value={profile.restingHeartRate} min={25} max={100} step={1} suffix=" bpm" color="red" onChange={(value) => setProfile({ ...profile, restingHeartRate: value })} />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">{t.profile.maxHR}</label>
-            <NumberPicker value={profile.maxHeartRate} min={120} max={220} step={1} suffix=" bpm" color="orange" onChange={(value) => setProfile({ ...profile, maxHeartRate: value })} />
-            <p className="text-xs text-gray-500 mt-2">
-              💡 {t.profile.suggestedMaxHR}: <span className="text-orange-400">{suggestedMaxHR} bpm</span>
-              {profile.maxHeartRate !== suggestedMaxHR && (
-                <button onClick={() => setProfile({ ...profile, maxHeartRate: suggestedMaxHR })} className="ml-2 text-orange-400 underline">
-                  {language === 'es' ? 'Usar sugerida' : 'Use suggested'}
-                </button>
-              )}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* BMI */}
-      <div className="bg-gradient-to-br from-purple-900/50 to-blue-900/50 rounded-xl p-4 border border-purple-700/30">
-        <h3 className="font-semibold mb-3 text-purple-300">{t.profile.bmi}</h3>
-        <div className="flex items-baseline gap-2">
-          <span className="text-4xl font-bold text-white">{bmi}</span>
-          <span className={`text-lg ${bmiCategory.color}`}>{bmiCategory.text}</span>
-        </div>
-        <div className="mt-3 h-2 bg-gray-700 rounded-full overflow-hidden">
-          <div className="h-full flex">
-            <div className="bg-yellow-500 flex-1" />
-            <div className="bg-green-500 flex-1" />
-            <div className="bg-orange-500 flex-1" />
-            <div className="bg-red-500 flex-1" />
-          </div>
-        </div>
-        <div className="flex justify-between text-xs text-gray-500 mt-1"><span>18.5</span><span>25</span><span>30</span><span>35+</span></div>
-        <div
-          className="w-3 h-3 bg-white rounded-full shadow-lg mt-1"
-          style={{ marginLeft: `${Math.min(Math.max((bmi - 15) / 25 * 100, 0), 100)}%`, transform: 'translateX(-50%) translateY(-0.75rem)' }}
-        />
-      </div>
-
-      {/* Save button */}
-      <button
-        onClick={handleSave}
-        disabled={saved}
-        className={`w-full py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${saved ? 'bg-green-600 text-white' : 'bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700'}`}
-      >
-        {saved ? <><Check size={20} /> {t.profile.saved}</> : <><Save size={20} /> {t.profile.saveChanges}</>}
-      </button>
-
-      {/* Appearance: Theme + Language */}
-      <div className="bg-gray-800 rounded-xl p-4">
-        <h3 className="font-semibold mb-4 flex items-center gap-2">
-          <Palette className="text-pink-400" size={20} />
-          {t.profile.appearance}
-        </h3>
-
-        {/* Language switcher */}
-        <div className="mb-4">
-          <label className="text-sm text-gray-400 mb-2 flex items-center gap-1.5">
-            <Globe size={14} /> {t.profile.language}
-          </label>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setLanguage('es')}
-              className={`flex-1 py-2.5 rounded-xl font-medium text-sm transition-all ${language === 'es' ? 'bg-orange-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}
-            >
-              🇪🇸 {t.profile.spanish}
-            </button>
-            <button
-              onClick={() => setLanguage('en')}
-              className={`flex-1 py-2.5 rounded-xl font-medium text-sm transition-all ${language === 'en' ? 'bg-orange-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}
-            >
-              🇬🇧 {t.profile.english}
-            </button>
-          </div>
-        </div>
-
-        {/* Theme picker */}
-        <label className="text-sm text-gray-400 mb-2 block">{t.profile.theme}</label>
+      <Card title={t.profile.data}>
         <div className="grid grid-cols-2 gap-2">
-          {THEMES.map((th) => (
-            <button
-              key={th.id}
-              onClick={() => setTheme(th.id)}
-              className={`p-3 rounded-xl text-left transition-all border-2 ${theme === th.id ? 'border-orange-500 bg-gray-700' : 'border-transparent bg-gray-700/50 hover:bg-gray-700'}`}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xl">{th.emoji}</span>
-                <span className="font-semibold text-sm">{th.name}</span>
-                {theme === th.id && <Check size={14} className="text-orange-400 ml-auto" />}
-              </div>
-              <p className="text-xs text-gray-400 leading-tight">{th.description}</p>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Export/Import */}
-      <div className="bg-gray-800 rounded-xl p-4">
-        <h3 className="font-semibold mb-4 flex items-center gap-2">
-          <Download className="text-green-400" size={20} />
-          {t.profile.data}
-        </h3>
-
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <button onClick={onExportData} className="py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 text-sm">
-            <Download size={16} /> {t.profile.exportData}
-          </button>
-          <label className="py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer text-sm">
-            <Upload size={16} /> {t.profile.importData}
-            <input type="file" accept=".json,.csv" onChange={handleFileImport} className="hidden" />
+          <Button variant="success" onClick={onExportData} iconLeft={<Download className="h-4 w-4" />}>
+            {t.profile.exportData}
+          </Button>
+          <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-blue-500 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-600">
+            <Upload className="h-4 w-4" aria-hidden="true" />
+            {t.profile.importData}
+            <input type="file" accept=".json" onChange={handleFileImport} className="sr-only" />
           </label>
+          <Button variant="secondary" size="sm" onClick={onDownloadTemplate}>
+            {t.profile.downloadTemplate}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={onDownloadExerciseNames}>
+            {t.profile.downloadExercises}
+          </Button>
         </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <button onClick={onDownloadTemplate} className="py-2.5 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-medium transition-colors text-sm">
-            📋 {t.profile.downloadTemplate}
-          </button>
-          <button onClick={onDownloadExerciseNames} className="py-2.5 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-medium transition-colors text-sm">
-            📋 {t.profile.downloadExercises}
-          </button>
-        </div>
-
-        {importError && <p className="mt-3 text-red-400 text-sm">{importError}</p>}
-        {importSuccess && (
-          <p className="mt-3 text-green-400 text-sm flex items-center gap-1">
-            <Check size={16} /> {t.profile.importSuccess}
+        {importError && (
+          <p role="alert" className="mt-3 text-sm text-red-400">
+            {importError}
           </p>
         )}
-      </div>
+        {importSuccess && (
+          <p className="mt-3 flex items-center gap-1 text-sm text-emerald-400">
+            <Check className="h-4 w-4" aria-hidden="true" /> {t.profile.importSuccess}
+          </p>
+        )}
+      </Card>
     </div>
   );
 }

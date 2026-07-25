@@ -7,24 +7,26 @@ import NumericInput from './NumericInput';
 
 interface Props {
   templates: WorkoutTemplate[];
+  userCustomTemplates?: WorkoutTemplate[];
   weeklyPlan: WeeklyPlan;
   onSaveTemplate: (t: WorkoutTemplate) => void;
   onDeleteTemplate: (id: string) => void;
   onUpdateWeeklyPlan: (plan: WeeklyPlan) => void;
   getSuggestedSets: (exerciseId: string, numSets: number, defaultReps: number, defaultWeight: number) => { reps: number; weight: number }[];
-  allExercises: Exercise[]; // NEW: receive all exercises including custom
+  allExercises: Exercise[];
 }
 
 const WORKOUT_TYPES: WorkoutType[] = ['push', 'pull', 'legs', 'upper', 'lower', 'full', 'custom'];
 
-export default function TemplatesTab({ 
-  templates, 
-  weeklyPlan, 
-  onSaveTemplate, 
-  onDeleteTemplate, 
-  onUpdateWeeklyPlan, 
+export default function TemplatesTab({
+  templates,
+  userCustomTemplates = [],
+  weeklyPlan,
+  onSaveTemplate,
+  onDeleteTemplate,
+  onUpdateWeeklyPlan,
   getSuggestedSets,
-  allExercises, // NEW
+  allExercises,
 }: Props) {
   const [activeSection, setActiveSection] = useState<'plan' | 'templates'>('plan');
   const [editingTemplate, setEditingTemplate] = useState<WorkoutTemplate | null>(null);
@@ -41,7 +43,9 @@ export default function TemplatesTab({
   const [exerciseSearch, setExerciseSearch] = useState(''); // NEW: search state
 
   const allTemplates = [...DEFAULT_TEMPLATES, ...templates.filter(t => !DEFAULT_TEMPLATES.some(d => d.id === t.id))];
-  const customTemplates = templates.filter(t => !DEFAULT_TEMPLATES.some(d => d.id === t.id));
+  const customTemplates = userCustomTemplates.length > 0
+    ? userCustomTemplates.filter(t => !DEFAULT_TEMPLATES.some(d => d.id === t.id))
+    : templates.filter(t => !DEFAULT_TEMPLATES.some(d => d.id === t.id));
 
   // Helper to find exercise by ID from allExercises
   const getExerciseById = (id: string): Exercise | undefined => {

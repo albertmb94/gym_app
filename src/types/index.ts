@@ -17,6 +17,10 @@ export type MuscleGroup =
 
 export type WorkoutType = 'push' | 'pull' | 'legs' | 'upper' | 'lower' | 'full' | 'custom';
 
+export type ThemeName = 'dark' | 'light' | 'black' | 'contrast';
+
+export type Language = 'es' | 'en';
+
 export interface Exercise {
   id: string;
   name: string;
@@ -29,26 +33,26 @@ export interface Exercise {
 }
 
 export interface PhysicalProfile {
-  height: number; // cm
-  weight: number; // kg
+  height: number;
+  weight: number;
   age: number;
-  sex: 'male' | 'female';
-  restingHeartRate: number; // bpm
-  maxHeartRate: number; // bpm
+  sex: 'male' | 'female' | 'other';
+  restingHeartRate: number;
+  maxHeartRate: number;
 }
 
 export interface CardioType {
   id: string;
   name: string;
-  metValue: number; // Metabolic Equivalent of Task
+  metValue: number;
   icon: string;
 }
 
 export interface GpxPoint {
   lat: number;
   lng: number;
-  ele?: number; // meters
-  time?: string; // ISO
+  ele?: number;
+  time?: string;
 }
 
 export interface GpxRoute {
@@ -62,21 +66,21 @@ export interface CardioSession {
   id: string;
   date: string;
   cardioTypeId: string;
-  duration: number; // minutes
+  duration: number;
   averageHeartRate: number;
   caloriesBurned: number;
   notes?: string;
   gpxRoute?: GpxRoute;
 }
 
-export type ThemeName = 'dark' | 'black' | 'light' | 'contrast';
-
 export interface SetLog {
   id: string;
   reps: number;
-  weight: number; // kg
+  weight: number;
   completed: boolean;
-  isWarmup?: boolean; // warm-up sets are excluded from progressive overload suggestions
+  isWarmup?: boolean;
+  restSeconds?: number;
+  rpe?: number;
 }
 
 export interface ExerciseLog {
@@ -88,13 +92,14 @@ export interface ExerciseLog {
 
 export interface WorkoutSession {
   id: string;
-  date: string; // ISO string
+  date: string;
   type: WorkoutType;
   name: string;
   exercises: ExerciseLog[];
   durationMinutes?: number;
   completed: boolean;
   caloriesBurned?: number;
+  notes?: string;
 }
 
 export interface TemplateSet {
@@ -118,23 +123,35 @@ export interface WorkoutTemplate {
 export interface WeeklyPlan {
   daysPerWeek: number;
   days: {
-    dayIndex: number; // 0=Mon, 1=Tue...
+    dayIndex: number;
     templateId: string | null;
   }[];
 }
 
+export interface UserPreferences {
+  theme?: ThemeName;
+  language?: Language;
+  reduceMotion?: boolean;
+  reduceTransparency?: boolean;
+  units?: 'metric' | 'imperial';
+}
+
 export interface UserProfile {
+  userId: string;
   username: string;
+  displayName?: string;
   createdAt: string;
   weeklyPlan: WeeklyPlan;
   customTemplates: WorkoutTemplate[];
   physicalProfile?: PhysicalProfile;
-  customExercises?: Exercise[];
-  hiddenExerciseIds?: string[]; // default exercises hidden for this user only
+  customExercises: Exercise[];
+  hiddenExerciseIds: string[];
+  preferences?: UserPreferences;
 }
 
 export interface AppData {
   users: Record<string, UserProfile>;
-  sessions: Record<string, WorkoutSession[]>; // keyed by username
-  cardioSessions: Record<string, CardioSession[]>; // keyed by username
+  sessions: Record<string, WorkoutSession[]>;
+  cardioSessions: Record<string, CardioSession[]>;
+  revision?: number;
 }
