@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { PhysicalProfile } from '../types';
-import { User, Save, Check, Download, Upload, Palette, Globe, LogOut } from 'lucide-react';
+import { User, Save, Check, Download, Upload, Palette, Globe, LogOut, Moon, Sun } from 'lucide-react';
 import NumberPicker from './NumberPicker';
 import { useTheme, THEMES } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -63,10 +63,10 @@ export default function ProfileTab({
 
   const bmiValue = bmi(profile);
   const bmiCategory = (() => {
-    if (bmiValue < 18.5) return { text: t.profile.underweight, color: 'text-amber-400' };
-    if (bmiValue < 25) return { text: t.profile.normal, color: 'text-emerald-400' };
-    if (bmiValue < 30) return { text: t.profile.overweight, color: 'text-orange-400' };
-    return { text: t.profile.obese, color: 'text-red-400' };
+    if (bmiValue < 18.5) return { text: t.profile.underweight, color: 'text-[color:var(--warning)]' };
+    if (bmiValue < 25) return { text: t.profile.normal, color: 'text-[color:var(--success)]' };
+    if (bmiValue < 30) return { text: t.profile.overweight, color: 'text-accent' };
+    return { text: t.profile.obese, color: 'text-[color:var(--danger)]' };
   })();
 
   const suggestedMaxHR = maxHeartRateFromAge(profile.age);
@@ -96,11 +96,11 @@ export default function ProfileTab({
 
   return (
     <div className="space-y-4">
-      <Card>
+      <Card level="glass1">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="flex items-center gap-2 text-2xl font-bold text-primary">
-              <User className="text-orange-300" aria-hidden="true" />
+            <h1 className="flex items-center gap-2 text-[24px] font-semibold text-primary tracking-tight">
+              <User className="text-accent" aria-hidden="true" />
               {t.profile.account}
             </h1>
             <p className="text-sm text-secondary">
@@ -113,7 +113,7 @@ export default function ProfileTab({
         </div>
       </Card>
 
-      <Card title={t.profile.physicalData}>
+      <Card level="glass1" title={t.profile.physicalData}>
         <div className="grid gap-4">
           <Field label={t.profile.height}>
             <NumberPicker
@@ -158,13 +158,9 @@ export default function ProfileTab({
                   aria-checked={profile.sex === opt.id}
                   onClick={() => setProfile({ ...profile, sex: opt.id })}
                   className={cn(
-                    'rounded-2xl py-3 text-sm font-semibold transition-colors',
+                    'rounded-[14px] py-3 text-[14px] font-semibold transition-all duration-200 ease-apple active:scale-[0.98]',
                     profile.sex === opt.id
-                      ? opt.id === 'male'
-                        ? 'bg-blue-500 text-white'
-                        : opt.id === 'female'
-                          ? 'bg-pink-500 text-white'
-                          : 'bg-purple-500 text-white'
+                      ? 'bg-accent text-on-accent'
                       : 'bg-surface-3 text-secondary hover:bg-surface-2',
                   )}
                 >
@@ -205,7 +201,7 @@ export default function ProfileTab({
               <button
                 type="button"
                 onClick={() => setProfile({ ...profile, maxHeartRate: suggestedMaxHR })}
-                className="text-xs text-orange-300 underline-offset-2 hover:underline"
+                className="text-[12px] text-accent underline-offset-2 hover:underline"
               >
                 {language === 'es' ? 'Usar sugerida' : 'Use suggested'} ({suggestedMaxHR} bpm)
               </button>
@@ -214,7 +210,7 @@ export default function ProfileTab({
         </div>
       </Card>
 
-      <Card title={t.profile.bmi}>
+      <Card level="glass1" title={t.profile.bmi}>
         <div className="flex items-baseline gap-3">
           <span className="text-4xl font-bold text-primary">{bmiValue.toFixed(1)}</span>
           <span className={cn('text-sm font-medium', bmiCategory.color)}>{bmiCategory.text}</span>
@@ -232,7 +228,7 @@ export default function ProfileTab({
         {saved ? t.profile.saved : t.profile.saveChanges}
       </Button>
 
-      <Card title={t.profile.appearance}>
+      <Card level="glass1" title={t.profile.appearance}>
         <div className="space-y-4">
           <div>
             <label className="mb-2 flex items-center gap-2 text-sm font-medium text-secondary">
@@ -251,8 +247,8 @@ export default function ProfileTab({
                   aria-checked={language === lang.id}
                   onClick={() => setLanguage(lang.id as 'es' | 'en')}
                   className={cn(
-                    'rounded-2xl py-2.5 text-sm font-semibold transition-colors',
-                    language === lang.id ? 'bg-orange-500 text-white' : 'bg-surface-3 text-secondary hover:bg-surface-2',
+                    'rounded-[14px] py-2.5 text-[14px] font-semibold transition-all duration-200 ease-apple active:scale-[0.98]',
+                    language === lang.id ? 'bg-accent text-on-accent' : 'bg-surface-3 text-secondary hover:bg-surface-2',
                   )}
                 >
                   {lang.label}
@@ -261,41 +257,59 @@ export default function ProfileTab({
             </div>
           </div>
           <div>
-            <label className="mb-2 flex items-center gap-2 text-sm font-medium text-secondary">
+            <label className="mb-2 flex items-center gap-2 text-[13px] font-medium text-secondary">
               <Palette className="h-4 w-4" aria-hidden="true" />
               {t.profile.theme}
             </label>
             <div role="radiogroup" aria-label={t.profile.theme} className="grid grid-cols-2 gap-2">
-              {THEMES.map((th) => (
-                <button
-                  key={th.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={theme === th.id}
-                  onClick={() => setTheme(th.id)}
-                  className={cn(
-                    'rounded-2xl border p-3 text-left transition-colors',
-                    theme === th.id ? 'border-orange-500 bg-surface-2' : 'border-app bg-surface-2 hover:bg-surface-3',
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl" aria-hidden="true">{th.emoji}</span>
-                    <span className="text-sm font-semibold text-primary">{th.name}</span>
-                    {theme === th.id && <Check className="ml-auto h-4 w-4 text-orange-300" aria-hidden="true" />}
-                  </div>
-                </button>
-              ))}
+              {THEMES.map((th) => {
+                const isSelected = theme === th.id;
+                return (
+                  <button
+                    key={th.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    onClick={() => setTheme(th.id)}
+                    className={cn(
+                      'rounded-[14px] border p-3 text-left transition-all duration-200 ease-apple',
+                      isSelected
+                        ? 'border-accent bg-accent-soft'
+                        : 'border-app bg-surface-2 hover:bg-surface-3',
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div
+                        aria-hidden="true"
+                        className={cn(
+                          'grid h-8 w-8 place-items-center rounded-[10px] border',
+                          isSelected
+                            ? 'bg-canvas text-accent border-accent'
+                            : 'bg-canvas text-muted border-app',
+                        )}
+                      >
+                        {th.id === 'dark' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[14px] font-semibold text-primary">{th.label}</div>
+                        <div className="text-[11px] text-muted truncate">{th.description}</div>
+                      </div>
+                      {isSelected && <Check className="ml-auto h-4 w-4 text-accent flex-shrink-0" aria-hidden="true" />}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
       </Card>
 
-      <Card title={t.profile.data}>
+      <Card level="glass1" title={t.profile.data}>
         <div className="grid grid-cols-2 gap-2">
           <Button variant="success" onClick={onExportData} iconLeft={<Download className="h-4 w-4" />}>
             {t.profile.exportData}
           </Button>
-          <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-blue-500 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-600">
+          <label className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-[14px] bg-[color:var(--info)] px-4 py-3 text-[14px] font-semibold text-white hover:opacity-90 active:scale-[0.98] transition-all">
             <Upload className="h-4 w-4" aria-hidden="true" />
             {t.profile.importData}
             <input type="file" accept=".json" onChange={handleFileImport} className="sr-only" />
@@ -308,12 +322,12 @@ export default function ProfileTab({
           </Button>
         </div>
         {importError && (
-          <p role="alert" className="mt-3 text-sm text-red-400">
+          <p role="alert" className="mt-3 text-[13px] text-[color:var(--danger)]">
             {importError}
           </p>
         )}
         {importSuccess && (
-          <p className="mt-3 flex items-center gap-1 text-sm text-emerald-400">
+          <p className="mt-3 flex items-center gap-1 text-[13px] text-[color:var(--success)]">
             <Check className="h-4 w-4" aria-hidden="true" /> {t.profile.importSuccess}
           </p>
         )}

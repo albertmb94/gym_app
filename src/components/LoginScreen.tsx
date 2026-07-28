@@ -1,11 +1,11 @@
 import { useState, useRef } from 'react';
-import { Eye, EyeOff, KeyRound, User, Loader2, Trash2, Dumbbell } from 'lucide-react';
+import { Eye, EyeOff, KeyRound, User, Trash2, Activity } from 'lucide-react';
 import { Field, TextInput } from './ui/Field';
 import { Button } from './ui/Button';
+import { SegmentedControl } from './ui/SegmentedControl';
 import { useLanguage } from '../contexts/LanguageContext';
 import type { LoginResult } from '../hooks/useStorage';
 import type { StoredUser } from '../hooks/useStorage';
-import { cn } from '../utils/cn';
 
 interface Props {
   onLogin: (username: string, token: string) => Promise<LoginResult>;
@@ -75,17 +75,17 @@ export default function LoginScreen({ onLogin, onRegister, knownUsers, onRemoveU
         role="main"
         className="grid min-h-dvh place-items-center bg-canvas px-4 py-8"
       >
-        <div className="w-full max-w-md surface p-6 shadow-2xl">
-          <h1 className="text-xl font-bold text-primary">{t.profile.recoveryCode}</h1>
-          <p className="mt-2 text-sm text-secondary">{t.profile.recoveryCodeDesc}</p>
+        <div className="w-full max-w-md glass-1 p-6">
+          <h1 className="text-[20px] font-semibold text-primary tracking-tight">{t.profile.recoveryCode}</h1>
+          <p className="mt-2 text-[14px] text-secondary">{t.profile.recoveryCodeDesc}</p>
           <div
             role="status"
             aria-live="polite"
-            className="mt-4 rounded-2xl border border-amber-400/40 bg-amber-500/10 p-4 text-center font-mono text-2xl tracking-widest text-amber-200"
+            className="mt-5 rounded-2xl border border-[color:var(--accent-soft-strong)] bg-accent-soft p-5 text-center font-mono text-[26px] tracking-[0.18em] text-accent"
           >
             {recoveryCode}
           </div>
-          <div className="mt-4 flex gap-2">
+          <div className="mt-5 flex gap-2">
             <Button
               variant="secondary"
               fullWidth
@@ -109,69 +109,59 @@ export default function LoginScreen({ onLogin, onRegister, knownUsers, onRemoveU
       role="main"
       className="relative grid min-h-dvh place-items-center bg-canvas overflow-hidden px-4 py-8"
     >
+      {/* Capa decorativa: mesh gradient muy sutil inspirado en visionOS */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,122,26,0.18),transparent_55%),radial-gradient(circle_at_80%_70%,rgba(232,93,4,0.16),transparent_55%)]"
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(60% 50% at 20% 20%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%),' +
+            'radial-gradient(50% 40% at 80% 70%, color-mix(in srgb, var(--info) 8%, transparent), transparent 70%)',
+        }}
       />
-      <div className="relative w-full max-w-md space-y-6">
-        <header className="text-center">
+
+      <div className="relative w-full max-w-md space-y-5">
+        <header className="flex flex-col items-center text-center">
           <div
             aria-hidden="true"
-            className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-3xl bg-gradient-to-br from-orange-400 to-rose-500 text-white shadow-xl"
+            className="mb-4 grid h-16 w-16 place-items-center rounded-[20px] glass-tint"
+            style={{ boxShadow: '0 12px 40px -10px color-mix(in srgb, var(--accent) 60%, transparent)' }}
           >
-            <Dumbbell className="h-8 w-8" />
+            <Activity className="h-8 w-8" aria-hidden="true" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-primary">{t.app.name}</h1>
-          <p className="mt-1 text-sm text-secondary">{t.auth.welcome}</p>
+          <h1 className="text-[28px] font-semibold text-primary tracking-tight">{t.app.name}</h1>
+          <p className="mt-1 text-[14px] text-secondary">{t.auth.welcome}</p>
         </header>
 
-        <section className="surface p-6 shadow-2xl">
-          <div role="tablist" aria-label={t.nav.primary} className="mb-5 grid grid-cols-2 rounded-2xl bg-surface-2 p-1">
-            <button
-              role="tab"
-              type="button"
-              aria-selected={mode === 'login'}
-              onClick={() => setMode('login')}
-              className={cn(
-                'rounded-xl py-2 text-sm font-semibold transition-colors',
-                mode === 'login' ? 'bg-orange-500 text-white' : 'text-secondary hover:text-primary',
-              )}
-            >
-              {t.auth.signIn}
-            </button>
-            <button
-              role="tab"
-              type="button"
-              aria-selected={mode === 'register'}
-              onClick={() => setMode('register')}
-              className={cn(
-                'rounded-xl py-2 text-sm font-semibold transition-colors',
-                mode === 'register' ? 'bg-orange-500 text-white' : 'text-secondary hover:text-primary',
-              )}
-            >
-              {t.auth.register}
-            </button>
+        <section className="glass-1 p-6">
+          <div className="mb-5">
+            <SegmentedControl
+              ariaLabel={t.nav.primary}
+              value={mode}
+              onChange={(v) => setMode(v)}
+              options={[
+                { value: 'login' as Mode, label: t.auth.signIn },
+                { value: 'register' as Mode, label: t.auth.register },
+              ]}
+            />
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <Field label={t.auth.username} required>
               {(id) => (
-                <div className="relative">
-                  <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
-                  <TextInput
-                    id={id}
-                    ref={usernameRef}
-                    type="text"
-                    autoComplete="username"
-                    spellCheck={false}
-                    inputMode="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="pl-9"
-                    invalid={Boolean(error) && !username.trim()}
-                    autoFocus
-                  />
-                </div>
+                <TextInput
+                  id={id}
+                  ref={usernameRef}
+                  type="text"
+                  autoComplete="username"
+                  spellCheck={false}
+                  inputMode="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  invalid={Boolean(error) && !username.trim()}
+                  leadingIcon={<User className="h-4 w-4" aria-hidden="true" />}
+                  autoFocus
+                />
               )}
             </Field>
 
@@ -181,32 +171,31 @@ export default function LoginScreen({ onLogin, onRegister, knownUsers, onRemoveU
               description={t.auth.passwordHelp}
             >
               {(id) => (
-                <div className="relative">
-                  <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
-                  <TextInput
-                    id={id}
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-9 pr-10"
-                    invalid={Boolean(error) && password.length < 8}
-                    minLength={8}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? t.auth.hidePassword : t.auth.showPassword}
-                    className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-muted hover:bg-white/5 hover:text-primary"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
-                  </button>
-                </div>
+                <TextInput
+                  id={id}
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  invalid={Boolean(error) && password.length < 8}
+                  minLength={8}
+                  leadingIcon={<KeyRound className="h-4 w-4" aria-hidden="true" />}
+                  trailingIcon={
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      aria-label={showPassword ? t.auth.hidePassword : t.auth.showPassword}
+                      className="grid h-7 w-7 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-primary transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                    </button>
+                  }
+                />
               )}
             </Field>
 
             {error && (
-              <p role="alert" className="text-sm text-red-400">
+              <p role="alert" className="text-[13px] text-[color:var(--danger)]">
                 {error}
               </p>
             )}
@@ -217,23 +206,25 @@ export default function LoginScreen({ onLogin, onRegister, knownUsers, onRemoveU
               size="lg"
               fullWidth
               loading={submitting}
-              iconLeft={submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             >
               {mode === 'login' ? t.auth.signIn : t.auth.register}
             </Button>
 
-            <p className="text-center text-xs text-muted">
+            <p className="text-center text-[12px] text-muted">
               {mode === 'login' ? t.auth.localOnly : t.auth.syncBenefit}
             </p>
           </form>
         </section>
 
         {knownUsers.length > 0 && (
-          <section className="surface p-4 shadow-2xl">
-            <h2 className="px-2 pb-2 text-sm font-semibold text-secondary">{t.auth.recentUsers}</h2>
+          <section className="glass-1 p-4">
+            <h2 className="px-2 pb-2 text-[13px] font-semibold text-secondary">{t.auth.recentUsers}</h2>
             <ul className="space-y-1">
               {knownUsers.map((user) => (
-                <li key={user.userId} className="flex items-center justify-between gap-2 rounded-xl px-2 py-2 hover:bg-white/5">
+                <li
+                  key={user.userId}
+                  className="flex items-center justify-between gap-2 rounded-[12px] px-2 py-2 hover:bg-surface-2 transition-colors"
+                >
                   <button
                     type="button"
                     onClick={() => {
@@ -242,10 +233,13 @@ export default function LoginScreen({ onLogin, onRegister, knownUsers, onRemoveU
                     }}
                     className="flex flex-1 items-center gap-3 text-left"
                   >
-                    <span aria-hidden="true" className="grid h-9 w-9 place-items-center rounded-full bg-orange-500/20 text-orange-200">
+                    <span
+                      aria-hidden="true"
+                      className="grid h-9 w-9 place-items-center rounded-full bg-accent-soft text-accent text-[14px] font-semibold"
+                    >
                       {user.username.slice(0, 1).toUpperCase()}
                     </span>
-                    <span className="text-sm font-medium text-primary">{user.username}</span>
+                    <span className="text-[14px] font-medium text-primary">{user.username}</span>
                   </button>
                   <button
                     type="button"
@@ -253,7 +247,7 @@ export default function LoginScreen({ onLogin, onRegister, knownUsers, onRemoveU
                       if (confirm(t.auth.removeUserConfirm)) onRemoveUser(user.userId);
                     }}
                     aria-label={`${t.auth.removeUser}: ${user.username}`}
-                    className="grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-red-500/10 hover:text-red-300"
+                    className="grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-[color:var(--danger)]/15 hover:text-[color:var(--danger)] transition-colors"
                   >
                     <Trash2 className="h-4 w-4" aria-hidden="true" />
                   </button>

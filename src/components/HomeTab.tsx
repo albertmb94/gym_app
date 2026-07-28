@@ -147,17 +147,17 @@ export default function HomeTab({
     <div className="space-y-5">
       <header className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-primary">
+          <h1 className="text-[26px] font-semibold text-primary tracking-tight">
             <span aria-hidden="true">👋</span> {username}
           </h1>
-          <p className="text-sm text-secondary capitalize">
+          <p className="text-[13px] text-secondary capitalize">
             {format(today, "EEEE, d 'de' MMMM", { locale: dateLocale })}
           </p>
         </div>
         {streak > 1 && (
           <div
             aria-label={`${streak} ${t.home.days}`}
-            className="inline-flex items-center gap-1.5 rounded-2xl border border-orange-500/30 bg-orange-500/10 px-3 py-1.5 text-orange-300"
+            className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent-soft px-3 py-1.5 text-accent"
           >
             <Flame className="h-4 w-4" aria-hidden="true" />
             <span className="font-bold">{streak}</span>
@@ -165,21 +165,22 @@ export default function HomeTab({
         )}
       </header>
 
+      {/* Hero card: today */}
       <section
         aria-label={t.home.startTraining}
-        className="relative overflow-hidden rounded-3xl glass p-6 shadow-2xl"
+        className="relative overflow-hidden rounded-[24px] glass-1 p-6"
       >
-        <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-orange-500/20 blur-3xl" />
-        <div aria-hidden="true" className="pointer-events-none absolute -bottom-12 -left-8 h-40 w-40 rounded-full bg-rose-500/20 blur-3xl" />
+        <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-accent-soft blur-3xl" />
+        <div aria-hidden="true" className="pointer-events-none absolute -bottom-16 -left-8 h-44 w-44 rounded-full bg-accent-soft blur-3xl opacity-60" />
         <div className="relative">
-          <p className="text-xs font-semibold uppercase tracking-wider text-orange-300">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent">
             {t.home.startTraining}
           </p>
-          <h2 className="mt-1 text-2xl font-bold text-primary">
+          <h2 className="mt-1.5 text-[24px] font-semibold text-primary tracking-tight">
             {todayTemplate ? todayTemplate.name : t.home.noWorkoutPlanned}
           </h2>
           {todayTemplate && (
-            <p className="mt-1 text-sm text-secondary">
+            <p className="mt-1 text-[13px] text-secondary">
               {todayTemplate.exercises.length} {t.history.exercises} · {todayTemplate.totalSets} {t.history.sets}
             </p>
           )}
@@ -187,7 +188,7 @@ export default function HomeTab({
             variant="primary"
             size="lg"
             fullWidth
-            className="mt-4"
+            className="mt-5"
             onClick={() => todayTemplate ? handleStartFromTemplate(todayTemplate) : handleStartBlank()}
             iconLeft={<Play className="h-5 w-5" />}
           >
@@ -197,12 +198,17 @@ export default function HomeTab({
       </section>
 
       {latestDraft && (
-        <Card>
+        <Card level="glass1" padding="sm">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-400" aria-hidden="true" />
+            <div
+              aria-hidden="true"
+              className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-[10px] bg-[color:var(--warning)]/15 text-[color:var(--warning)]"
+            >
+              <AlertTriangle className="h-4 w-4" />
+            </div>
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-primary truncate">{latestDraft.name}</p>
-              <p className="text-xs text-secondary">
+              <p className="text-[14px] font-semibold text-primary truncate">{latestDraft.name}</p>
+              <p className="text-[12px] text-secondary">
                 {language === 'es' ? 'Borrador sin completar' : 'Unfinished draft'}
               </p>
             </div>
@@ -217,12 +223,12 @@ export default function HomeTab({
         </Card>
       )}
 
-      <Card>
-        <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-primary">
-          <Calendar className="h-4 w-4 text-orange-300" aria-hidden="true" />
+      <Card level="glass1" padding="md">
+        <h2 className="mb-3 flex items-center gap-2 text-[14px] font-semibold text-primary">
+          <Calendar className="h-4 w-4 text-accent" aria-hidden="true" />
           {t.home.weeklyOverview}
         </h2>
-        <div role="list" className="grid grid-cols-7 gap-1">
+        <div role="list" className="grid grid-cols-7 gap-1.5">
           {weekDays.map((day, i) => {
             const dayPlan = weeklyPlan.days.find((d) => d.dayIndex === i);
             const dayTemplate = dayPlan?.templateId ? templates.find((tt) => tt.id === dayPlan.templateId) : null;
@@ -232,17 +238,18 @@ export default function HomeTab({
             const shortDays = (t as any).daysShort as string[] | undefined;
             return (
               <div key={i} role="listitem" className="flex flex-col items-center gap-1">
-                <span className="text-xs text-muted">{shortDays?.[i] || ''}</span>
+                <span className="text-[11px] text-muted">{shortDays?.[i] || ''}</span>
                 <span
                   className={cn(
-                    'grid h-9 w-9 place-items-center rounded-xl text-xs font-bold transition-all',
-                    isToday && 'ring-2 ring-orange-400',
-                    daySession?.completed && 'bg-emerald-500 text-white',
-                    daySession && !daySession.completed && 'bg-amber-500 text-white',
+                    'grid h-9 w-9 place-items-center rounded-[10px] text-[12px] font-semibold',
+                    'transition-all duration-200 ease-apple',
+                    isToday && 'ring-2 ring-accent',
+                    daySession?.completed && 'bg-[color:var(--success)] text-on-accent',
+                    daySession && !daySession.completed && 'bg-[color:var(--warning)] text-white',
                     !daySession && dayTemplate && 'text-white',
-                    !daySession && !dayTemplate && 'bg-surface-3 text-muted',
+                    !daySession && !dayTemplate && 'bg-surface-2 text-muted border border-app',
                   )}
-                  style={!daySession && dayTemplate && typeColor ? { backgroundColor: `${typeColor}33` } : undefined}
+                  style={!daySession && dayTemplate && typeColor ? { backgroundColor: `${typeColor}33`, color: typeColor } : undefined}
                 >
                   {day.getDate()}
                 </span>
@@ -267,41 +274,51 @@ export default function HomeTab({
         ].map((stat) => (
           <div
             key={stat.label}
-            className="rounded-2xl glass px-3 py-3 text-center"
+            className="glass-1 px-3 py-3 text-center"
           >
-            <p className="text-xl font-bold text-orange-300">{stat.value}</p>
-            <p className="text-xs text-secondary">{stat.label}</p>
+            <p className="text-[20px] font-semibold text-accent tracking-tight">{stat.value}</p>
+            <p className="text-[11px] text-secondary mt-0.5">{stat.label}</p>
           </div>
         ))}
       </section>
 
-      <Card>
-        <h2 className="mb-3 text-base font-semibold text-primary">{t.home.quickStart}</h2>
+      <Card level="glass1" padding="md">
+        <h2 className="mb-3 text-[14px] font-semibold text-primary">{t.home.quickStart}</h2>
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={handleStartBlank}
-            className="rounded-2xl border border-app p-3 text-left transition-colors hover:border-orange-500 hover:bg-surface-2"
+            className="rounded-[16px] border border-app bg-surface-2 p-3.5 text-left transition-all duration-200 ease-apple hover:bg-surface-3 hover:border-app-strong active:scale-[0.98]"
           >
-            <Plus className="mb-2 h-5 w-5 text-orange-300" aria-hidden="true" />
-            <p className="text-sm font-semibold text-primary">{t.home.startBlank}</p>
-            <p className="text-xs text-muted">{language === 'es' ? 'Desde cero' : 'From scratch'}</p>
+            <div
+              aria-hidden="true"
+              className="mb-2.5 grid h-9 w-9 place-items-center rounded-[10px] bg-accent-soft text-accent"
+            >
+              <Plus className="h-5 w-5" />
+            </div>
+            <p className="text-[14px] font-semibold text-primary">{t.home.startBlank}</p>
+            <p className="text-[12px] text-muted">{language === 'es' ? 'Desde cero' : 'From scratch'}</p>
           </button>
           <button
             type="button"
             onClick={() => setShowTemplateSelector(true)}
-            className="rounded-2xl border border-app p-3 text-left transition-colors hover:border-orange-500 hover:bg-surface-2"
+            className="rounded-[16px] border border-app bg-surface-2 p-3.5 text-left transition-all duration-200 ease-apple hover:bg-surface-3 hover:border-app-strong active:scale-[0.98]"
           >
-            <TrendingUp className="mb-2 h-5 w-5 text-orange-300" aria-hidden="true" />
-            <p className="text-sm font-semibold text-primary">{t.home.startFromTemplate}</p>
-            <p className="text-xs text-muted">{language === 'es' ? 'Con cargas sugeridas' : 'With suggested loads'}</p>
+            <div
+              aria-hidden="true"
+              className="mb-2.5 grid h-9 w-9 place-items-center rounded-[10px] bg-accent-soft text-accent"
+            >
+              <TrendingUp className="h-5 w-5" />
+            </div>
+            <p className="text-[14px] font-semibold text-primary">{t.home.startFromTemplate}</p>
+            <p className="text-[12px] text-muted">{language === 'es' ? 'Con cargas sugeridas' : 'With suggested loads'}</p>
           </button>
         </div>
       </Card>
 
       {recent.length > 0 && (
-        <Card>
-          <h2 className="mb-3 text-base font-semibold text-primary">
+        <Card level="glass1" padding="md">
+          <h2 className="mb-3 text-[14px] font-semibold text-primary">
             {language === 'es' ? 'Últimos entrenamientos' : 'Recent workouts'}
           </h2>
           <ul className="space-y-2">
@@ -313,7 +330,7 @@ export default function HomeTab({
                   <button
                     type="button"
                     onClick={() => onEditSession(s)}
-                    className="flex w-full items-center gap-3 rounded-2xl border border-app p-3 text-left transition-colors hover:border-orange-500 hover:bg-surface-2"
+                    className="flex w-full items-center gap-3 rounded-[14px] border border-app bg-surface-2 p-3 text-left transition-all duration-200 ease-apple hover:bg-surface-3 hover:border-app-strong active:scale-[0.99]"
                   >
                     <span
                       aria-hidden="true"
@@ -321,8 +338,8 @@ export default function HomeTab({
                       style={{ backgroundColor: typeColor }}
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-primary truncate">{s.name}</p>
-                      <p className="text-xs text-muted">
+                      <p className="text-[14px] font-semibold text-primary truncate">{s.name}</p>
+                      <p className="text-[12px] text-muted">
                         {format(new Date(s.date), 'd MMM', { locale: dateLocale })} · {vol.toLocaleString()} kg
                       </p>
                     </div>
@@ -361,12 +378,12 @@ export default function HomeTab({
                 <button
                   type="button"
                   onClick={() => handleStartFromTemplate(tmpl)}
-                  className="flex w-full items-center gap-3 rounded-2xl border border-app p-3 text-left transition-colors hover:border-orange-500 hover:bg-surface-2"
+                  className="flex w-full items-center gap-3 rounded-[14px] border border-app bg-surface-2 p-3 text-left transition-all duration-200 ease-apple hover:bg-surface-3 hover:border-app-strong active:scale-[0.99]"
                 >
                   <span aria-hidden="true" className="h-10 w-1 flex-shrink-0 rounded-full" style={{ backgroundColor: typeColor }} />
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-primary">{tmpl.name}</p>
-                    <p className="text-xs text-muted">
+                    <p className="text-[14px] font-semibold text-primary">{tmpl.name}</p>
+                    <p className="text-[12px] text-muted">
                       {tmpl.exercises.length} {t.history.exercises} · {tmpl.totalSets} {t.history.sets}
                     </p>
                   </div>

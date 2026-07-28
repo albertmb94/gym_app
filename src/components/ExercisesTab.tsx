@@ -143,12 +143,12 @@ export default function ExercisesTab({
           <button
             key={m}
             onClick={() => toggleMuscle(m, isPrimary)}
-            className={`text-xs px-2 py-1 rounded transition-all ${
+            className={`text-[11px] px-2 py-1 rounded-[8px] transition-all ${
               selected.includes(m)
                 ? isPrimary
-                  ? 'bg-orange-600 text-white'
-                  : 'bg-gray-600 text-white'
-                : 'bg-gray-700 text-gray-400 hover:text-white'
+                  ? 'bg-accent text-on-accent'
+                  : 'bg-surface-3 text-primary'
+                : 'bg-surface-2 text-secondary hover:text-primary hover:bg-surface-3'
             }`}
           >
             {MUSCLE_LABELS[m]}
@@ -167,7 +167,7 @@ export default function ExercisesTab({
           className={`text-xs px-2 py-1 rounded font-bold transition-all border ${
             editWorkoutTypes.includes(t) 
               ? 'text-white border-transparent' 
-              : 'bg-transparent text-gray-400 border-gray-700'
+              : 'bg-transparent text-secondary border-app'
           }`}
           style={editWorkoutTypes.includes(t) ? { backgroundColor: WORKOUT_TYPE_COLORS[t] } : {}}
         >
@@ -183,23 +183,23 @@ export default function ExercisesTab({
       <div className="p-4 pb-0 space-y-3">
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Buscar ejercicios..."
-              className="w-full pl-9 pr-10 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+              className="block w-full rounded-[12px] border border-app bg-surface-2 py-2.5 pl-9 pr-10 text-[14px] text-primary placeholder:text-muted focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             />
             {search && (
-              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">
+              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-primary">
                 <X className="w-4 h-4" />
               </button>
             )}
           </div>
           <button
             onClick={startAddNew}
-            className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-xl flex items-center gap-2"
+            className="bg-[color:var(--success)] hover:opacity-90 px-4 py-2 rounded-[12px] text-white font-semibold flex items-center gap-2 transition-all active:scale-[0.98]"
           >
             <Plus size={18} />
             <span className="hidden sm:inline">Nuevo</span>
@@ -210,7 +210,7 @@ export default function ExercisesTab({
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide" style={{ touchAction: 'pan-x' }}>
           <button
             onClick={() => setSelectedMuscle(null)}
-            className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${!selectedMuscle ? 'bg-orange-600 text-white' : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white'}`}
+            className={`flex-shrink-0 px-3 py-1.5 rounded-[10px] text-[12px] font-medium transition-colors ${!selectedMuscle ? 'bg-accent text-on-accent' : 'bg-surface-2 border border-app text-secondary hover:text-primary hover:bg-surface-3'}`}
           >
             Todos
           </button>
@@ -218,7 +218,7 @@ export default function ExercisesTab({
             <button
               key={m}
               onClick={() => setSelectedMuscle(selectedMuscle === m ? null : m)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${selectedMuscle === m ? 'bg-orange-600 text-white' : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white'}`}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-[10px] text-[12px] font-medium transition-colors ${selectedMuscle === m ? 'bg-accent text-on-accent' : 'bg-surface-2 border border-app text-secondary hover:text-primary hover:bg-surface-3'}`}
             >
               {MUSCLE_LABELS[m]}
             </button>
@@ -229,7 +229,7 @@ export default function ExercisesTab({
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide" style={{ touchAction: 'pan-x' }}>
           <button
             onClick={() => setSelectedType(null)}
-            className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${!selectedType ? 'bg-gray-600 text-white' : 'bg-gray-800 border border-gray-700 text-gray-400'}`}
+            className={`flex-shrink-0 px-3 py-1.5 rounded-[10px] text-[12px] font-semibold transition-colors ${!selectedType ? 'bg-surface-3 text-primary' : 'bg-surface-2 border border-app text-secondary'}`}
           >
             Todos
           </button>
@@ -237,7 +237,7 @@ export default function ExercisesTab({
             <button
               key={t}
               onClick={() => setSelectedType(selectedType === t ? null : t)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${selectedType === t ? 'text-white border-transparent' : 'bg-transparent text-gray-400 border-gray-700'}`}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-[10px] text-[12px] font-semibold transition-all border ${selectedType === t ? 'text-white border-transparent' : 'bg-transparent text-secondary border-app'}`}
               style={selectedType === t ? { backgroundColor: WORKOUT_TYPE_COLORS[t] } : {}}
             >
               {WORKOUT_TYPE_LABELS[t]}
@@ -249,66 +249,66 @@ export default function ExercisesTab({
       {/* Add New Exercise Form Modal */}
       {showAddForm && (
         <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4">
-          <div className="bg-gray-800 rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="p-4 border-b border-gray-700 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Nuevo Ejercicio</h3>
-              <button onClick={() => setShowAddForm(false)} className="p-2 hover:bg-gray-700 rounded-lg">
+          <div className="glass-2 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b border-app flex items-center justify-between">
+              <h3 className="text-[17px] font-semibold text-primary tracking-tight">Nuevo Ejercicio</h3>
+              <button onClick={() => setShowAddForm(false)} className="p-2 hover:bg-surface-2 rounded-[10px] text-secondary hover:text-primary">
                 <X size={20} />
               </button>
             </div>
 
             <div className="p-4 space-y-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Nombre *</label>
+                <label className="block text-[13px] text-secondary mb-1">Nombre *</label>
                 <input
                   type="text"
                   value={editName}
                   onChange={e => setEditName(e.target.value)}
-                  className="w-full bg-gray-700 rounded-lg px-3 py-2"
+                  className="block w-full rounded-[12px] border border-app bg-surface-2 px-3.5 py-2.5 text-[14px] text-primary placeholder:text-muted focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                   placeholder="Nombre del ejercicio"
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Descripción</label>
+                <label className="block text-[13px] text-secondary mb-1">Descripción</label>
                 <textarea
                   value={editDescription}
                   onChange={e => setEditDescription(e.target.value)}
-                  className="w-full bg-gray-700 rounded-lg px-3 py-2 h-20 resize-none"
+                  className="block w-full rounded-[12px] border border-app bg-surface-2 px-3.5 py-2.5 text-[14px] text-primary placeholder:text-muted focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent resize-none h-20"
                   placeholder="Descripción del ejercicio"
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-1">URL de imagen (opcional)</label>
+                <label className="block text-[13px] text-secondary mb-1">URL de imagen (opcional)</label>
                 <input
                   type="text"
                   value={editImageUrl}
                   onChange={e => setEditImageUrl(e.target.value)}
-                  className="w-full bg-gray-700 rounded-lg px-3 py-2"
+                  className="block w-full rounded-[12px] border border-app bg-surface-2 px-3.5 py-2.5 text-[14px] text-primary placeholder:text-muted focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                   placeholder="https://..."
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Músculos primarios</label>
+                <label className="block text-[13px] text-secondary mb-2">Músculos primarios</label>
                 <MuscleSelector isPrimary={true} />
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Músculos secundarios</label>
+                <label className="block text-[13px] text-secondary mb-2">Músculos secundarios</label>
                 <MuscleSelector isPrimary={false} />
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Tipo de entrenamiento</label>
+                <label className="block text-[13px] text-secondary mb-2">Tipo de entrenamiento</label>
                 <WorkoutTypeSelector />
               </div>
 
               <button
                 onClick={saveNewExercise}
                 disabled={!editName.trim()}
-                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed py-3 rounded-xl font-semibold flex items-center justify-center gap-2"
+                className="w-full bg-[color:var(--success)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed py-3 rounded-[14px] text-white font-semibold flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
               >
                 <Check size={20} />
                 Crear Ejercicio
@@ -320,7 +320,7 @@ export default function ExercisesTab({
 
       {/* Exercise list */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-24">
-        <p className="text-gray-600 text-xs">{filtered.length} ejercicio{filtered.length !== 1 ? 's' : ''}</p>
+        <p className="text-[11px] text-muted">{filtered.length} ejercicio{filtered.length !== 1 ? 's' : ''}</p>
 
         {filtered.map(ex => {
           const isExpanded = expandedId === ex.id;
@@ -328,7 +328,7 @@ export default function ExercisesTab({
           const isCustom = ex.isCustom || customExercises.some(c => c.id === ex.id);
 
           return (
-            <div key={ex.id} className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+            <div key={ex.id} className="glass-1 overflow-hidden">
               <div
                 className="flex items-center gap-3 p-3 cursor-pointer"
                 onClick={() => !isEditing && setExpandedId(isExpanded ? null : ex.id)}
@@ -345,11 +345,11 @@ export default function ExercisesTab({
                       type="text"
                       value={editName}
                       onChange={e => setEditName(e.target.value)}
-                      className="w-full bg-gray-700 rounded px-2 py-1 text-sm font-semibold"
+                      className="w-full rounded-[10px] border border-app bg-surface-2 px-2 py-1 text-[14px] font-semibold text-primary focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                       onClick={e => e.stopPropagation()}
                     />
                   ) : (
-                    <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+                    <h3 className="text-[14px] font-semibold text-primary flex items-center gap-2">
                       {ex.name}
                       {isCustom && (
                         <span className="text-xs bg-purple-600 px-2 py-0.5 rounded">Personalizado</span>
@@ -358,12 +358,12 @@ export default function ExercisesTab({
                   )}
                   <div className="flex flex-wrap gap-1 mt-1">
                     {ex.primaryMuscles.map(m => (
-                      <span key={m} className="text-xs px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded-full font-medium">
+                      <span key={m} className="text-[11px] px-2 py-0.5 bg-accent-soft text-accent rounded-full font-medium">
                         {MUSCLE_LABELS[m]}
                       </span>
                     ))}
                     {ex.secondaryMuscles.slice(0, 2).map(m => (
-                      <span key={m} className="text-xs px-2 py-0.5 bg-gray-700 text-gray-400 rounded-full">
+                      <span key={m} className="text-[11px] px-2 py-0.5 bg-surface-3 text-secondary rounded-full">
                         {MUSCLE_LABELS[m]}
                       </span>
                     ))}
@@ -390,63 +390,63 @@ export default function ExercisesTab({
                         startEditing(ex);
                       }
                     }}
-                    className={`p-2 rounded-lg ${isEditing ? 'bg-green-600 text-white' : 'hover:bg-gray-700 text-gray-400'}`}
+                    className={`p-2 rounded-[10px] transition-colors ${isEditing ? 'bg-[color:var(--success)] text-white' : 'hover:bg-surface-2 text-secondary'}`}
                   >
                     {isEditing ? <Save size={16} /> : <Edit2 size={16} />}
                   </button>
-                  {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-500 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" />}
+                  {isExpanded ? <ChevronUp className="h-4 w-4 text-muted flex-shrink-0" /> : <ChevronDown className="h-4 w-4 text-muted flex-shrink-0" />}
                 </div>
               </div>
 
               {isExpanded && (
-                <div className="border-t border-gray-700 p-4 space-y-3">
+                <div className="border-t border-app p-4 space-y-3">
                   {isEditing ? (
                     <>
                       <div>
-                        <label className="block text-sm text-gray-400 mb-1">Descripción</label>
+                        <label className="block text-[13px] text-secondary mb-1">Descripción</label>
                         <textarea
                           value={editDescription}
                           onChange={e => setEditDescription(e.target.value)}
-                          className="w-full bg-gray-700 rounded-lg px-3 py-2 h-20 resize-none text-sm"
+                          className="block w-full rounded-[12px] border border-app bg-surface-2 px-3.5 py-2.5 text-[14px] text-primary placeholder:text-muted focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent resize-none h-20"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm text-gray-400 mb-1">URL de imagen</label>
+                        <label className="block text-[13px] text-secondary mb-1">URL de imagen</label>
                         <input
                           type="text"
                           value={editImageUrl}
                           onChange={e => setEditImageUrl(e.target.value)}
-                          className="w-full bg-gray-700 rounded-lg px-3 py-2 text-sm"
+                          className="block w-full rounded-[12px] border border-app bg-surface-2 px-3.5 py-2.5 text-[14px] text-primary placeholder:text-muted focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm text-gray-400 mb-2">Músculos primarios</label>
+                        <label className="block text-[13px] text-secondary mb-2">Músculos primarios</label>
                         <MuscleSelector isPrimary={true} />
                       </div>
 
                       <div>
-                        <label className="block text-sm text-gray-400 mb-2">Músculos secundarios</label>
+                        <label className="block text-[13px] text-secondary mb-2">Músculos secundarios</label>
                         <MuscleSelector isPrimary={false} />
                       </div>
 
                       <div>
-                        <label className="block text-sm text-gray-400 mb-2">Tipo de entrenamiento</label>
+                        <label className="block text-[13px] text-secondary mb-2">Tipo de entrenamiento</label>
                         <WorkoutTypeSelector />
                       </div>
 
                       <div className="flex gap-2">
                         <button
                           onClick={saveEdit}
-                          className="flex-1 bg-green-600 hover:bg-green-700 py-2 rounded-lg font-semibold flex items-center justify-center gap-2"
+                          className="flex-1 bg-[color:var(--success)] hover:opacity-90 py-2 rounded-[10px] text-white font-semibold flex items-center justify-center gap-2 transition-all"
                         >
                           <Save size={16} />
                           Guardar
                         </button>
                         <button
                           onClick={cancelEdit}
-                          className="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded-lg font-semibold"
+                          className="flex-1 bg-surface-2 hover:bg-surface-3 py-2 rounded-[10px] font-semibold text-primary"
                         >
                           Cancelar
                         </button>
@@ -459,7 +459,7 @@ export default function ExercisesTab({
                             setEditingId(null);
                             setExpandedId(null);
                           }}
-                          className="w-full bg-red-600/20 hover:bg-red-600/30 text-red-400 py-2 rounded-lg font-semibold flex items-center justify-center gap-2"
+                          className="w-full bg-[color:var(--danger)]/15 hover:bg-[color:var(--danger)]/25 text-[color:var(--danger)] py-2 rounded-[10px] font-semibold flex items-center justify-center gap-2 transition-colors"
                         >
                           <Trash2 size={16} />
                           Eliminar ejercicio
@@ -468,15 +468,15 @@ export default function ExercisesTab({
                     </>
                   ) : (
                     <>
-                      <p className="text-gray-300 text-sm">{ex.description}</p>
+                      <p className="text-[13px] text-primary">{ex.description}</p>
 
                       <div>
-                        <p className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-2">Músculos primarios</p>
+                        <p className="text-[11px] text-muted font-semibold uppercase tracking-wider mb-2">Músculos primarios</p>
                         <div className="flex flex-wrap gap-2">
                           {ex.primaryMuscles.map(m => (
-                            <div key={m} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-orange-900/20 border border-orange-800/30 rounded-lg">
-                              <div className="w-2 h-2 rounded-full bg-orange-400" />
-                              <span className="text-orange-300 text-sm font-medium">{MUSCLE_LABELS[m]}</span>
+                            <div key={m} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-accent-soft border border-[color:var(--accent-soft-strong)] rounded-[10px]">
+                              <div className="h-2 w-2 rounded-full bg-accent" />
+                              <span className="text-[13px] font-medium text-accent">{MUSCLE_LABELS[m]}</span>
                             </div>
                           ))}
                         </div>
@@ -484,12 +484,12 @@ export default function ExercisesTab({
 
                       {ex.secondaryMuscles.length > 0 && (
                         <div>
-                          <p className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-2">Músculos secundarios</p>
+                          <p className="text-[11px] text-muted font-semibold uppercase tracking-wider mb-2">Músculos secundarios</p>
                           <div className="flex flex-wrap gap-2">
                             {ex.secondaryMuscles.map(m => (
-                              <div key={m} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-700/50 border border-gray-600 rounded-lg">
-                                <div className="w-2 h-2 rounded-full bg-gray-400" />
-                                <span className="text-gray-300 text-sm">{MUSCLE_LABELS[m]}</span>
+                              <div key={m} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-surface-2 border border-app rounded-[10px]">
+                                <div className="h-2 w-2 rounded-full bg-muted" />
+                                <span className="text-[13px] text-primary">{MUSCLE_LABELS[m]}</span>
                               </div>
                             ))}
                           </div>
@@ -497,7 +497,7 @@ export default function ExercisesTab({
                       )}
 
                       <div>
-                        <p className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-2">Tipo de entrenamiento</p>
+                        <p className="text-[11px] text-muted font-semibold uppercase tracking-wider mb-2">Tipo de entrenamiento</p>
                         <div className="flex flex-wrap gap-1.5">
                           {ex.workoutType.filter(t => t !== 'custom').map(t => (
                             <span

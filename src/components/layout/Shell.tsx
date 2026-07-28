@@ -1,7 +1,8 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { Home, History, BarChart2, User, Dumbbell, MoreHorizontal, LogOut, CloudOff, Cloud, AlertTriangle, Loader2 } from 'lucide-react';
+import { Home, History, BarChart2, User, Dumbbell, MoreHorizontal, LogOut, CloudOff, Cloud, AlertTriangle, Loader2, Sun, Moon } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { cn } from '../../utils/cn';
 import type { SyncState } from '../../lib/sync';
 
@@ -58,10 +59,10 @@ function SyncBadge({ status, onClick }: { status: SyncState; onClick: () => void
   }
 
   const variantClass = {
-    idle: 'bg-white/5 text-[color:var(--text-muted)] border-white/10',
-    pending: 'bg-sky-500/15 text-sky-200 border-sky-400/30',
-    error: 'bg-red-500/15 text-red-200 border-red-400/30',
-    success: 'bg-emerald-500/15 text-emerald-200 border-emerald-400/30',
+    idle: 'bg-surface-2 text-muted border-app',
+    pending: 'bg-[color:var(--info)]/15 text-[color:var(--info)] border-[color:var(--info)]/30',
+    error: 'bg-[color:var(--danger)]/15 text-[color:var(--danger)] border-[color:var(--danger)]/30',
+    success: 'bg-[color:var(--success)]/15 text-[color:var(--success)] border-[color:var(--success)]/30',
   }[variant];
 
   return (
@@ -70,7 +71,8 @@ function SyncBadge({ status, onClick }: { status: SyncState; onClick: () => void
       onClick={onClick}
       aria-live="polite"
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium',
+        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium',
+        'transition-colors duration-150 ease-apple',
         variantClass,
       )}
     >
@@ -93,15 +95,15 @@ function ConflictDialog({
       aria-describedby="conflict-desc"
       className="fixed inset-0 z-[150] flex items-center justify-center p-4"
     >
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" aria-hidden="true" />
-      <div className="relative w-full max-w-md glass-strong rounded-3xl p-6 shadow-2xl animate-slide-up">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-md animate-fade" aria-hidden="true" />
+      <div className="relative w-full max-w-md glass-2 rounded-[28px] p-6 shadow-[var(--shadow-dialog)] animate-spring">
         <div className="flex items-start gap-3">
-          <AlertTriangle className="h-6 w-6 flex-shrink-0 text-amber-400" aria-hidden="true" />
+          <AlertTriangle className="h-6 w-6 flex-shrink-0 text-[color:var(--warning)]" aria-hidden="true" />
           <div className="flex-1">
-            <h2 id="conflict-title" className="text-lg font-semibold text-primary">
+            <h2 id="conflict-title" className="text-[17px] font-semibold text-primary tracking-tight">
               {t.sync.conflictTitle}
             </h2>
-            <p id="conflict-desc" className="mt-1 text-sm text-secondary">
+            <p id="conflict-desc" className="mt-1 text-[13px] text-secondary">
               {t.sync.conflictDesc}
             </p>
           </div>
@@ -110,27 +112,42 @@ function ConflictDialog({
           <button
             type="button"
             onClick={() => onResolve('merge')}
-            className="w-full rounded-2xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-600 active:scale-[0.99]"
+            className="w-full rounded-[14px] bg-accent px-4 py-3 text-[14px] font-semibold text-on-accent hover:bg-[color:var(--accent-hover)] active:scale-[0.98] transition-all"
           >
             {t.sync.mergeLocalAndRemote}
           </button>
           <button
             type="button"
             onClick={() => onResolve('local')}
-            className="w-full rounded-2xl border border-app px-4 py-3 text-sm font-semibold text-primary hover:bg-white/5"
+            className="w-full rounded-[14px] bg-surface-2 border border-app px-4 py-3 text-[14px] font-semibold text-primary hover:bg-surface-3 transition-colors"
           >
             {t.sync.keepLocal}
           </button>
           <button
             type="button"
             onClick={() => onResolve('remote')}
-            className="w-full rounded-2xl border border-app px-4 py-3 text-sm font-semibold text-primary hover:bg-white/5"
+            className="w-full rounded-[14px] bg-surface-2 border border-app px-4 py-3 text-[14px] font-semibold text-primary hover:bg-surface-3 transition-colors"
           >
             {t.sync.useRemote}
           </button>
         </div>
       </div>
     </div>
+  );
+}
+
+function ThemeToggle() {
+  const { theme, toggleTheme } = useTheme();
+  return (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      aria-label={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+      title={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+      className="grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-primary transition-colors"
+    >
+      {theme === 'dark' ? <Sun className="h-4 w-4" aria-hidden="true" /> : <Moon className="h-4 w-4" aria-hidden="true" />}
+    </button>
   );
 }
 
@@ -153,32 +170,45 @@ export default function Shell({
 
   return (
     <div className="min-h-dvh bg-canvas text-primary relative">
-      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[300] focus:rounded-lg focus:bg-orange-500 focus:px-3 focus:py-2 focus:text-white">
-        Saltar al contenido
+      {/* Ambient mesh — visionOS-style subtle gradient that shifts per route */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0"
+        style={{
+          background:
+            'radial-gradient(50% 40% at 20% 0%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 70%),' +
+            'radial-gradient(40% 30% at 100% 100%, color-mix(in srgb, var(--info) 4%, transparent), transparent 70%)',
+        }}
+      />
+
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[300] focus:rounded-lg focus:bg-accent focus:px-3 focus:py-2 focus:text-white">
+        {t.general.skipToContent}
       </a>
 
       <header
         role="banner"
-        className="sticky top-0 z-40 glass border-b border-app"
+        className="sticky top-0 z-40 glass-2 border-b border-app"
       >
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4 safe-top">
           <Link to="/" className="flex items-center gap-2 text-primary" aria-label={t.app.name}>
             <span
               aria-hidden="true"
-              className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-orange-400 to-rose-500 text-white shadow-lg"
+              className="grid h-8 w-8 place-items-center rounded-[10px] glass-tint"
+              style={{ boxShadow: '0 4px 14px -4px color-mix(in srgb, var(--accent) 60%, transparent)' }}
             >
               <Dumbbell className="h-4 w-4" />
             </span>
-            <span className="text-base font-bold tracking-tight">{t.app.name}</span>
+            <span className="text-[15px] font-semibold tracking-tight">{t.app.name}</span>
           </Link>
           <div className="flex items-center gap-2">
             <SyncBadge status={syncStatus} onClick={onForceSync} />
-            <span className="hidden text-sm text-secondary sm:inline">{username}</span>
+            <span className="max-w-[8rem] truncate text-[13px] text-secondary">{username}</span>
+            <ThemeToggle />
             <button
               type="button"
               onClick={onLogout}
               aria-label={t.profile.logout}
-              className="grid h-10 w-10 place-items-center rounded-full text-muted hover:bg-white/5 hover:text-primary"
+              className="grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-primary transition-colors"
             >
               <LogOut className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -186,13 +216,17 @@ export default function Shell({
         </div>
       </header>
 
-      <main id="main-content" className="mx-auto w-full max-w-5xl px-4 pb-24 pt-4 sm:pb-8">
+      <main
+        key={location.pathname}
+        id="main-content"
+        className="animate-fade relative mx-auto w-full max-w-5xl px-4 pb-28 pt-4 sm:pb-8"
+      >
         {children}
       </main>
 
       <nav
         aria-label={t.nav.primary}
-        className="sticky bottom-0 z-40 glass border-t border-app safe-bottom"
+        className="sticky bottom-0 z-40 glass-2 border-t border-app safe-bottom"
       >
         <div className="mx-auto flex h-16 max-w-5xl items-stretch justify-around px-2">
           {PRIMARY_NAV.map((item) => {
@@ -207,11 +241,19 @@ export default function Shell({
                 end={item.to === '/'}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex min-w-[56px] flex-1 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-medium',
-                  active ? 'text-brand' : 'text-muted hover:text-secondary',
+                  'group flex min-w-[56px] flex-1 flex-col items-center justify-center gap-0.5 rounded-[12px] text-[11px] font-medium',
+                  'transition-colors duration-150 ease-apple',
+                  active ? 'text-accent' : 'text-muted hover:text-primary',
                 )}
               >
-                <Icon className="h-5 w-5" aria-hidden="true" />
+                <span
+                  className={cn(
+                    'grid h-7 w-7 place-items-center rounded-full transition-all duration-200 ease-apple',
+                    active && 'bg-accent-soft',
+                  )}
+                >
+                  <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+                </span>
                 <span>{label}</span>
               </NavLink>
             );
@@ -222,11 +264,19 @@ export default function Shell({
             aria-expanded={moreOpen}
             aria-haspopup="menu"
             className={cn(
-              'flex min-w-[56px] flex-1 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-medium',
-              moreOpen ? 'text-brand' : 'text-muted hover:text-secondary',
+              'flex min-w-[56px] flex-1 flex-col items-center justify-center gap-0.5 rounded-[12px] text-[11px] font-medium',
+              'transition-colors duration-150 ease-apple',
+              moreOpen ? 'text-accent' : 'text-muted hover:text-primary',
             )}
           >
-            <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
+            <span
+              className={cn(
+                'grid h-7 w-7 place-items-center rounded-full transition-all duration-200 ease-apple',
+                moreOpen && 'bg-accent-soft',
+              )}
+            >
+              <MoreHorizontal className="h-[18px] w-[18px]" aria-hidden="true" />
+            </span>
             <span>{t.nav.more}</span>
           </button>
         </div>
@@ -234,7 +284,7 @@ export default function Shell({
         {moreOpen && (
           <div
             role="menu"
-            className="mx-auto mb-2 max-w-5xl rounded-2xl glass-strong p-2 shadow-2xl"
+            className="mx-auto mb-2 max-w-5xl rounded-[20px] glass-2 p-2 shadow-[var(--shadow-dialog)]"
           >
             <div className="grid gap-1 sm:grid-cols-2">
               {[
@@ -250,8 +300,9 @@ export default function Shell({
                     role="menuitem"
                     aria-current={active ? 'page' : undefined}
                     className={cn(
-                      'flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium',
-                      active ? 'bg-orange-500/20 text-brand' : 'text-secondary hover:bg-white/5 hover:text-primary',
+                      'flex items-center gap-3 rounded-[12px] px-3 py-3 text-[14px] font-medium',
+                      'transition-colors duration-150 ease-apple',
+                      active ? 'bg-accent-soft text-accent' : 'text-secondary hover:bg-surface-2 hover:text-primary',
                     )}
                   >
                     <Icon className="h-4 w-4" aria-hidden="true" />

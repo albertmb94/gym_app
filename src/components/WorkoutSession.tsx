@@ -3,10 +3,15 @@ import { WorkoutSession as WorkoutSessionType, ExerciseLog, SetLog, Exercise, Mu
 import { useExercises } from '../contexts/ExercisesContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { generateId } from '../lib/id';
-import { Plus, Trash2, Check, ChevronDown, ChevronUp, Timer, Save, X, Search, GripVertical, Flame, Calendar } from 'lucide-react';
+import { Plus, Trash2, Check, ChevronDown, ChevronUp, Save, X, Search, GripVertical, Flame, Calendar, Play, Pause, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es, enUS } from 'date-fns/locale';
 import NumericInput from './NumericInput';
+import { IconButton } from './ui/IconButton';
+import { Button } from './ui/Button';
+import { Dialog } from './ui/Dialog';
+import { Sheet } from './ui/Sheet';
+import { cn } from '../utils/cn';
 
 interface Props {
   session: WorkoutSessionType;
@@ -15,6 +20,8 @@ interface Props {
   onDelete?: (sessionId: string) => void;
   getSuggestedSets: (exerciseId: string, numSets: number, defaultReps: number, defaultWeight: number) => { reps: number; weight: number }[];
 }
+
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=100&q=60';
 
 export default function WorkoutSession({ session: initialSession, onSave, onClose, onDelete, getSuggestedSets }: Props) {
   const { allExercises } = useExercises();
@@ -26,6 +33,8 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
   const [expandedExercise, setExpandedExercise] = useState<string | null>(initialSession.exercises[0]?.id || null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showAddExercise, setShowAddExercise] = useState(false);
+  const [exerciseSearch, setExerciseSearch] = useState('');
 
   // ── Editable date (log workouts for past days / fix a wrongly-dated one) ──
   const dateInputValue = (() => {
@@ -38,13 +47,11 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
     if (!value) return;
     const [y, m, day] = value.split('-').map(Number);
     const orig = new Date(session.date);
-    // Keep the original time-of-day so ordering within a day is preserved
     const next = new Date(y, m - 1, day, orig.getHours(), orig.getMinutes(), orig.getSeconds());
     setSession(prev => ({ ...prev, date: next.toISOString() }));
   };
 
   // ── Auto-save (pre-save) so a backgrounded/closed app never loses progress ──
-  // onSave upserts by id, so persisting the in-progress session as a draft is safe.
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
   const sessionRef = useRef(session);
@@ -52,18 +59,16 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
 
   const autoSave = () => {
     const s = sessionRef.current;
-    if (s.exercises.length === 0) return; // nothing worth persisting yet
+    if (s.exercises.length === 0) return;
     onSaveRef.current(s);
   };
 
-  // Debounced autosave on every change
   useEffect(() => {
     if (session.exercises.length === 0) return;
     const id = setTimeout(() => onSaveRef.current(sessionRef.current), 1500);
     return () => clearTimeout(id);
   }, [session]);
 
-  // Immediate autosave when the app is hidden / backgrounded / unloaded
   useEffect(() => {
     const onVisibility = () => { if (document.hidden) autoSave(); };
     document.addEventListener('visibilitychange', onVisibility);
@@ -78,11 +83,10 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
   const [timer, setTimer] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const timerOriginRef = useRef<number | null>(null); // Date.now() when timer was at 0
+  const timerOriginRef = useRef<number | null>(null);
 
   const toggleTimer = () => {
     if (!timerRunning) {
-      // Record when "0 seconds" was, accounting for already elapsed time
       timerOriginRef.current = Date.now() - timer * 1000;
     }
     setTimerRunning(r => !r);
@@ -94,14 +98,13 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
         if (timerOriginRef.current !== null) {
           setTimer(Math.floor((Date.now() - timerOriginRef.current) / 1000));
         }
-      }, 500); // 500ms tick to be more responsive
+      }, 500);
     } else {
       if (intervalRef.current) clearInterval(intervalRef.current);
     }
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [timerRunning]);
 
-  // Recover correct timer value when app returns from background
   useEffect(() => {
     const handleVisibility = () => {
       if (!document.hidden && timerRunning && timerOriginRef.current !== null) {
@@ -117,10 +120,6 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
     const sec = s % 60;
     return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
   };
-
-  // ── Exercise search / add ───────────────────────────────────────────────
-  const [showAddExercise, setShowAddExercise] = useState(false);
-  const [exerciseSearch, setExerciseSearch] = useState('');
 
   // ── Drag & drop (mouse + touch) ─────────────────────────────────────────
   const dragIndexRef = useRef<number | null>(null);
@@ -150,13 +149,11 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
     updateDragOver(null);
   };
 
-  // ── Mouse / HTML5 DnD (desktop) ──────────────────────────────────────────
   const handleDragStart = (idx: number) => { dragIndexRef.current = idx; };
   const handleDragOver = (e: React.DragEvent, idx: number) => { e.preventDefault(); updateDragOver(idx); };
   const handleDrop = (idx: number) => { performDrop(idx); };
   const handleDragEnd = () => { dragIndexRef.current = null; updateDragOver(null); };
 
-  // ── Touch DnD (mobile) ───────────────────────────────────────────────────
   const handleGripTouchStart = (e: React.TouchEvent, idx: number) => {
     e.stopPropagation();
     dragIndexRef.current = idx;
@@ -175,7 +172,7 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
     };
 
     const onTouchMove = (ev: TouchEvent) => {
-      ev.preventDefault(); // stop page scroll while dragging
+      ev.preventDefault();
       const targetIdx = getIdxAtY(ev.touches[0].clientY);
       if (targetIdx !== null) {
         dragOverIndexRef.current = targetIdx;
@@ -277,103 +274,82 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
   );
 
   return (
-    <div className="fixed inset-0 bg-gray-900 z-50 flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between flex-shrink-0">
-        <div className="min-w-0">
-          <h2 className="text-white font-bold text-lg truncate">{session.name}</h2>
-          <button
-            onClick={() => setShowDatePicker(v => !v)}
-            className="flex items-center gap-1 text-gray-400 hover:text-orange-400 text-sm transition-colors"
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            <span className="capitalize">{format(new Date(session.date), 'EEEE d MMM', { locale: dateLocale })}</span>
-            <ChevronDown className="w-3.5 h-3.5" />
-          </button>
-          {showDatePicker && (
-            <input
-              type="date"
-              value={dateInputValue}
-              max={new Date().toISOString().split('T')[0]}
-              onChange={e => handleDateChange(e.target.value)}
-              className="mt-2 bg-gray-700 border border-gray-600 rounded-lg px-2 py-1 text-white text-sm focus:outline-none focus:border-orange-500"
-            />
-          )}
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <button
-            onClick={toggleTimer}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-mono font-bold transition-colors ${timerRunning ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-300'}`}
-          >
-            <Timer className="w-4 h-4" />
-            {formatTime(timer)}
-          </button>
-          {onDelete && (
+    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-canvas text-primary">
+      {/* Header — glass-2 sticky */}
+      <header className="glass-2 border-b border-app flex-shrink-0">
+        <div className="flex items-center justify-between gap-3 px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[17px] font-semibold text-primary truncate tracking-tight">{session.name}</h2>
             <button
-              onClick={() => setConfirmDelete(true)}
-              className="text-gray-400 hover:text-red-400 p-1"
-              title={language === 'es' ? 'Eliminar entrenamiento' : 'Delete workout'}
+              onClick={() => setShowDatePicker(v => !v)}
+              className="mt-0.5 inline-flex items-center gap-1 text-[12px] text-secondary hover:text-accent transition-colors"
             >
-              <Trash2 className="w-5 h-5" />
+              <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="capitalize">{format(new Date(session.date), 'EEEE d MMM', { locale: dateLocale })}</span>
+              <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-200', showDatePicker && 'rotate-180')} />
             </button>
-          )}
-          <button onClick={onClose} className="text-gray-400 hover:text-white p-1">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Delete confirmation */}
-      {confirmDelete && onDelete && (
-        <div className="fixed inset-0 bg-black/70 z-[80] flex items-center justify-center p-4">
-          <div className="bg-gray-800 border border-gray-700 rounded-2xl p-5 w-full max-w-sm space-y-4">
-            <div className="flex items-center gap-3">
-              <Trash2 className="w-6 h-6 text-red-400 flex-shrink-0" />
-              <div>
-                <h3 className="text-white font-bold">{language === 'es' ? 'Eliminar entrenamiento' : 'Delete workout'}</h3>
-                <p className="text-gray-400 text-sm mt-0.5">
-                  {language === 'es'
-                    ? '¿Seguro que quieres eliminar este entrenamiento? No se puede deshacer.'
-                    : 'Are you sure you want to delete this workout? This cannot be undone.'}
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => { onDelete(session.id); setConfirmDelete(false); onClose(); }}
-                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700"
-              >
-                {t.general.delete}
-              </button>
-              <button
-                onClick={() => setConfirmDelete(false)}
-                className="flex-1 py-2.5 bg-gray-700 text-gray-200 rounded-xl font-semibold hover:bg-gray-600"
-              >
-                {t.general.cancel}
-              </button>
-            </div>
+            {showDatePicker && (
+              <input
+                type="date"
+                value={dateInputValue}
+                max={new Date().toISOString().split('T')[0]}
+                onChange={e => handleDateChange(e.target.value)}
+                className="mt-2 block w-full max-w-[180px] rounded-[10px] border border-app bg-surface-2 px-2.5 py-1.5 text-[13px] text-primary focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              />
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button
+              onClick={toggleTimer}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-[14px] font-semibold tabular-nums',
+                'transition-all duration-200 ease-apple',
+                'active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+                timerRunning
+                  ? 'bg-accent text-on-accent shadow-[0_4px_14px_-4px_color-mix(in_srgb,var(--accent)_60%,transparent)]'
+                  : 'bg-surface-2 text-primary border border-app',
+              )}
+              aria-label={timerRunning ? t.workout.timer : t.workout.timer}
+            >
+              {timerRunning ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+              {formatTime(timer)}
+            </button>
+            {onDelete && (
+              <IconButton
+                label={language === 'es' ? 'Eliminar entrenamiento' : 'Delete workout'}
+                icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
+                variant="ghost"
+                size="sm"
+                onClick={() => setConfirmDelete(true)}
+              />
+            )}
+            <IconButton
+              label={t.general.close}
+              icon={<X className="h-5 w-5" aria-hidden="true" />}
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+            />
           </div>
         </div>
-      )}
 
-      {/* Stats bar */}
-      <div className="bg-gray-800/50 border-b border-gray-700 px-4 py-2 flex gap-6 flex-shrink-0">
-        <div className="text-center">
-          <div className="text-orange-400 font-bold">{completedSets}/{totalSets}</div>
-          <div className="text-gray-500 text-xs">{t.history.sets}</div>
+        {/* Stats bar */}
+        <div className="grid grid-cols-3 gap-px border-t border-app bg-app">
+          {[
+            { value: `${completedSets}/${totalSets}`, label: t.history.sets, tint: 'text-accent' },
+            { value: `${totalVolume.toLocaleString()} kg`, label: t.stats.volumeLabel, tint: 'text-accent' },
+            { value: session.exercises.length, label: t.history.exercises, tint: 'text-primary' },
+          ].map((stat) => (
+            <div key={stat.label} className="bg-canvas px-4 py-2.5 text-center">
+              <div className={cn('text-[15px] font-semibold tabular-nums tracking-tight', stat.tint)}>{stat.value}</div>
+              <div className="text-[11px] text-muted mt-0.5">{stat.label}</div>
+            </div>
+          ))}
         </div>
-        <div className="text-center">
-          <div className="text-orange-400 font-bold">{totalVolume.toLocaleString()} kg</div>
-          <div className="text-gray-500 text-xs">{t.stats.volumeLabel}</div>
-        </div>
-        <div className="text-center">
-          <div className="text-orange-400 font-bold">{session.exercises.length}</div>
-          <div className="text-gray-500 text-xs">{t.history.exercises}</div>
-        </div>
-      </div>
+      </header>
 
       {/* Exercise list */}
-      <div ref={exerciseListRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div ref={exerciseListRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {session.exercises.map((exLog, idx) => {
           const exercise = allExercises.find((e: Exercise) => e.id === exLog.exerciseId);
           if (!exercise) return null;
@@ -382,7 +358,7 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
           const isDragOver = dragOverIndex === idx;
 
           return (
-            <div
+            <article
               key={exLog.id}
               data-drag-idx={idx}
               draggable
@@ -390,159 +366,189 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
               onDragOver={(e) => handleDragOver(e, idx)}
               onDrop={() => handleDrop(idx)}
               onDragEnd={handleDragEnd}
-              className={`bg-gray-800 rounded-xl border overflow-hidden transition-all ${isDragOver ? 'border-orange-500 shadow-lg shadow-orange-900/30 scale-[1.01]' : 'border-gray-700'}`}
+              className={cn(
+                'relative glass-1 rounded-[18px] overflow-hidden',
+                'transition-all duration-200 ease-apple',
+                isDragOver && 'ring-2 ring-accent scale-[1.01]',
+              )}
             >
               {/* Exercise header */}
-              <div className="flex items-center p-3 gap-2">
-                {/* Drag handle — works for both mouse (cursor-grab) and touch (onTouchStart) */}
-                <div
-                  className="text-gray-600 hover:text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0 px-1 select-none"
+              <div className="flex items-center gap-2 p-3">
+                <button
+                  type="button"
                   onTouchStart={(e) => handleGripTouchStart(e, idx)}
+                  aria-label={t.general.moreOptions}
+                  className="grid h-7 w-7 flex-shrink-0 cursor-grab place-items-center rounded-md text-muted active:cursor-grabbing hover:bg-surface-2 hover:text-secondary select-none touch-none"
                 >
-                  <GripVertical className="w-4 h-4" />
-                </div>
+                  <GripVertical className="h-4 w-4" aria-hidden="true" />
+                </button>
 
-                <div
-                  className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
+                <button
+                  type="button"
                   onClick={() => setExpandedExercise(isExpanded ? null : exLog.id)}
+                  className="flex flex-1 min-w-0 items-center gap-3 text-left"
                 >
                   <img
                     src={exercise.imageUrl}
                     alt={exercise.name}
-                    className="w-11 h-11 rounded-lg object-cover flex-shrink-0"
-                    onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=100&q=60'; }}
+                    className="h-11 w-11 rounded-[10px] object-cover flex-shrink-0"
+                    onError={e => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }}
                   />
-                  <div className="min-w-0">
-                    <div className="font-semibold text-white text-sm truncate">{exercise.name}</div>
-                    <div className="text-xs text-gray-400">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[14px] font-semibold text-primary truncate">{exercise.name}</div>
+                    <div className="text-[11px] text-secondary truncate">
                       {exercise.primaryMuscles.map((m: MuscleGroup) => muscleLabelMap[m] || m).join(', ')}
                     </div>
-                    <div className="text-xs text-orange-400 font-medium">{completedCount}/{exLog.sets.length} {t.history.sets}</div>
+                    <div className="mt-0.5 text-[12px] font-medium text-accent">
+                      {completedCount}/{exLog.sets.length} {t.history.sets}
+                    </div>
                   </div>
-                </div>
+                </button>
 
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <button
-                    onClick={e => { e.stopPropagation(); removeExercise(exLog.id); }}
-                    className="text-gray-600 hover:text-red-400 p-1"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                  <div
-                    className="cursor-pointer p-1"
+                <div className="flex flex-shrink-0 items-center gap-1">
+                  <IconButton
+                    label={t.general.delete}
+                    icon={<Trash2 className="h-3.5 w-3.5" aria-hidden="true" />}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeExercise(exLog.id)}
+                  />
+                  <IconButton
+                    label={isExpanded ? t.general.close : t.general.moreOptions}
+                    icon={isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setExpandedExercise(isExpanded ? null : exLog.id)}
-                  >
-                    {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-                  </div>
+                    aria-expanded={isExpanded}
+                  />
                 </div>
               </div>
 
-              {/* Sets */}
+              {/* Sets (expanded) */}
               {isExpanded && (
-                <div className="border-t border-gray-700 p-3 space-y-2">
-                  {/* Header */}
-                  <div className="grid grid-cols-12 gap-1 text-xs text-gray-500 font-medium px-1">
-                    <div className="col-span-1">#</div>
-                    <div className="col-span-1 text-center" title={language === 'es' ? 'Calentamiento' : 'Warm-up'}>W</div>
-                    <div className="col-span-4 text-center">{language === 'es' ? 'Peso kg' : 'Weight kg'}</div>
-                    <div className="col-span-3 text-center">Reps</div>
-                    <div className="col-span-2 text-center">✓</div>
-                    <div className="col-span-1"></div>
+                <div className="border-t border-app p-3 space-y-2">
+                  {/* Column header */}
+                  <div className="grid grid-cols-[1.5rem_2rem_1fr_1fr_2.5rem_1.75rem] items-center gap-1.5 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted">
+                    <span className="text-center">#</span>
+                    <span className="text-center" title={language === 'es' ? 'Calentamiento' : 'Warm-up'}>W</span>
+                    <span className="text-center">{language === 'es' ? 'Peso' : 'Weight'}</span>
+                    <span className="text-center">Reps</span>
+                    <span className="text-center">✓</span>
+                    <span></span>
                   </div>
 
                   {exLog.sets.map((set) => {
                     const isWarmup = !!set.isWarmup;
+                    const workIndex = exLog.sets.filter(s => !s.isWarmup).indexOf(set);
                     return (
                       <div
                         key={set.id}
-                        className={`grid grid-cols-12 gap-1 items-center px-1 py-1 rounded-lg transition-colors ${
+                        className={cn(
+                          'grid grid-cols-[1.5rem_2rem_1fr_1fr_2.5rem_1.75rem] items-center gap-1.5 rounded-[10px] px-1.5 py-1.5',
+                          'transition-colors duration-150',
                           set.completed
-                            ? isWarmup ? 'bg-yellow-900/15' : 'bg-green-900/20'
-                            : ''
-                        }`}
+                            ? isWarmup
+                              ? 'bg-[color:var(--warning)]/12'
+                              : 'bg-[color:var(--success)]/12'
+                            : 'bg-surface-2',
+                        )}
                       >
-                        {/* Set number / warmup label */}
-                        <div className="col-span-1 text-xs font-bold">
-                          {isWarmup
-                            ? <span className="text-yellow-500">W</span>
-                            : <span className="text-gray-500">{exLog.sets.filter(s => !s.isWarmup).indexOf(set) + 1}</span>
-                          }
-                        </div>
+                        {/* Set number */}
+                        <span className={cn(
+                          'text-center text-[12px] font-bold',
+                          isWarmup ? 'text-[color:var(--warning)]' : 'text-muted',
+                        )}>
+                          {isWarmup ? 'W' : (workIndex + 1)}
+                        </span>
 
                         {/* Warm-up toggle */}
-                        <div className="col-span-1 flex justify-center">
-                          <button
-                            onClick={() => updateSet(exLog.id, set.id, 'isWarmup', !isWarmup)}
-                            className={`w-6 h-6 rounded flex items-center justify-center transition-all ${
-                              isWarmup
-                                ? 'bg-yellow-500/30 text-yellow-400'
-                                : 'text-gray-700 hover:text-yellow-500'
-                            }`}
-                            title={isWarmup
-                              ? (language === 'es' ? 'Quitar calentamiento' : 'Remove warm-up')
-                              : (language === 'es' ? 'Marcar como calentamiento' : 'Mark as warm-up')}
-                          >
-                            <Flame className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => updateSet(exLog.id, set.id, 'isWarmup', !isWarmup)}
+                          className={cn(
+                            'mx-auto grid h-6 w-6 place-items-center rounded-md transition-all',
+                            isWarmup
+                              ? 'bg-[color:var(--warning)]/25 text-[color:var(--warning)]'
+                              : 'text-muted hover:text-[color:var(--warning)]',
+                          )}
+                          title={isWarmup
+                            ? (language === 'es' ? 'Quitar calentamiento' : 'Remove warm-up')
+                            : (language === 'es' ? 'Marcar como calentamiento' : 'Mark as warm-up')}
+                          aria-pressed={isWarmup}
+                        >
+                          <Flame className="h-3.5 w-3.5" aria-hidden="true" />
+                        </button>
 
-                        <div className="col-span-4">
-                          <NumericInput
-                            value={set.weight}
-                            onChange={(v) => updateSet(exLog.id, set.id, 'weight', v)}
-                            decimals
-                            min={0}
-                            step={0.5}
-                            placeholder="0"
-                            fallbackOnEmpty={0}
-                            className={`w-full text-center border rounded-lg py-1.5 text-sm focus:outline-none focus:border-orange-500 ${
-                              isWarmup
-                                ? 'bg-yellow-900/10 border-yellow-800/40 text-yellow-300'
-                                : 'bg-gray-700 border-gray-600 text-white'
-                            }`}
-                          />
-                        </div>
-                        <div className="col-span-3">
-                          <NumericInput
-                            value={set.reps}
-                            onChange={(v) => updateSet(exLog.id, set.id, 'reps', v)}
-                            min={0}
-                            placeholder="8"
-                            fallbackOnEmpty={8}
-                            className={`w-full text-center border rounded-lg py-1.5 text-sm focus:outline-none focus:border-orange-500 ${
-                              isWarmup
-                                ? 'bg-yellow-900/10 border-yellow-800/40 text-yellow-300'
-                                : 'bg-gray-700 border-gray-600 text-white'
-                            }`}
-                          />
-                        </div>
-                        <div className="col-span-2 flex justify-center">
-                          <button
-                            onClick={() => updateSet(exLog.id, set.id, 'completed', !set.completed)}
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                              set.completed
-                                ? isWarmup
-                                  ? 'bg-yellow-500 text-white shadow-lg shadow-yellow-900/50'
-                                  : 'bg-green-500 text-white shadow-lg shadow-green-900/50'
-                                : 'border-2 border-gray-600 text-gray-600 hover:border-green-500 hover:text-green-500'
-                            }`}
-                          >
-                            <Check className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <div className="col-span-1 flex justify-center">
-                          <button onClick={() => removeSet(exLog.id, set.id)} className="text-gray-700 hover:text-red-400">
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                        {/* Weight */}
+                        <NumericInput
+                          value={set.weight}
+                          onChange={(v) => updateSet(exLog.id, set.id, 'weight', v)}
+                          decimals
+                          min={0}
+                          step={0.5}
+                          placeholder="0"
+                          fallbackOnEmpty={0}
+                          className={cn(
+                            'w-full text-center rounded-[10px] border py-1.5 text-[14px] font-medium tabular-nums',
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+                            isWarmup
+                              ? 'bg-[color:var(--warning)]/10 border-[color:var(--warning)]/30 text-[color:var(--warning)]'
+                              : 'bg-canvas border-app text-primary focus-visible:border-accent',
+                          )}
+                        />
+
+                        {/* Reps */}
+                        <NumericInput
+                          value={set.reps}
+                          onChange={(v) => updateSet(exLog.id, set.id, 'reps', v)}
+                          min={0}
+                          placeholder="8"
+                          fallbackOnEmpty={8}
+                          className={cn(
+                            'w-full text-center rounded-[10px] border py-1.5 text-[14px] font-medium tabular-nums',
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+                            isWarmup
+                              ? 'bg-[color:var(--warning)]/10 border-[color:var(--warning)]/30 text-[color:var(--warning)]'
+                              : 'bg-canvas border-app text-primary focus-visible:border-accent',
+                          )}
+                        />
+
+                        {/* Complete */}
+                        <button
+                          type="button"
+                          onClick={() => updateSet(exLog.id, set.id, 'completed', !set.completed)}
+                          className={cn(
+                            'mx-auto grid h-7 w-7 place-items-center rounded-full transition-all duration-150 ease-apple',
+                            'active:scale-90',
+                            set.completed
+                              ? isWarmup
+                                ? 'bg-[color:var(--warning)] text-white'
+                                : 'bg-[color:var(--success)] text-white'
+                              : 'border-2 border-app text-muted hover:border-accent hover:text-accent',
+                          )}
+                          aria-pressed={set.completed}
+                          aria-label={t.general.confirm}
+                        >
+                          {set.completed ? <Check className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5 opacity-30" />}
+                        </button>
+
+                        {/* Remove */}
+                        <button
+                          type="button"
+                          onClick={() => removeSet(exLog.id, set.id)}
+                          aria-label={t.general.delete}
+                          className="mx-auto grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-[color:var(--danger)]/15 hover:text-[color:var(--danger)] transition-colors"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     );
                   })}
 
-                  {/* Warmup legend if any */}
+                  {/* Warmup legend */}
                   {exLog.sets.some(s => s.isWarmup) && (
-                    <div className="flex items-center gap-1.5 text-xs text-yellow-600 px-1 pt-1">
-                      <Flame className="w-3 h-3" />
+                    <div className="flex items-center gap-1.5 px-1 pt-1 text-[11px] text-[color:var(--warning)]">
+                      <Flame className="h-3 w-3" aria-hidden="true" />
                       {language === 'es'
                         ? 'Las series W (calentamiento) no cuentan para la progresión de peso'
                         : 'W (warm-up) sets are excluded from weight progression'}
@@ -550,96 +556,149 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
                   )}
 
                   <button
+                    type="button"
                     onClick={() => addSet(exLog.id)}
-                    className="w-full py-2 border border-dashed border-gray-600 text-gray-400 rounded-lg text-sm hover:border-orange-500 hover:text-orange-400 transition-colors flex items-center justify-center gap-1"
+                    className={cn(
+                      'flex w-full items-center justify-center gap-1.5 rounded-[12px] border border-dashed py-2 text-[13px] font-medium',
+                      'border-app text-secondary hover:border-accent hover:text-accent hover:bg-accent-soft/40',
+                      'transition-colors duration-150',
+                    )}
                   >
-                    <Plus className="w-4 h-4" /> {t.workout.addSet}
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                    {t.workout.addSet}
                   </button>
                 </div>
               )}
-            </div>
+            </article>
           );
         })}
 
-        {/* Add exercise button */}
         <button
+          type="button"
           onClick={() => setShowAddExercise(true)}
-          className="w-full py-3 border-2 border-dashed border-gray-700 text-gray-400 rounded-xl text-sm hover:border-orange-500 hover:text-orange-400 transition-colors flex items-center justify-center gap-2"
+          className={cn(
+            'flex w-full items-center justify-center gap-2 rounded-[18px] border-2 border-dashed py-3.5 text-[14px] font-semibold',
+            'border-app text-secondary hover:border-accent hover:text-accent hover:bg-accent-soft/40',
+            'transition-colors duration-150',
+          )}
         >
-          <Plus className="w-5 h-5" /> {t.workout.addExercise}
+          <Plus className="h-5 w-5" aria-hidden="true" />
+          {t.workout.addExercise}
         </button>
       </div>
 
-      {/* Bottom actions */}
-      <div className="bg-gray-800 border-t border-gray-700 p-4 flex gap-3 flex-shrink-0">
-        <button
-          onClick={handleSaveDraft}
-          className="flex-1 py-3 bg-gray-700 text-gray-200 rounded-xl font-semibold hover:bg-gray-600 transition-colors flex items-center justify-center gap-2"
-        >
-          <Save className="w-4 h-4" /> {language === 'es' ? 'Borrador' : 'Draft'}
-        </button>
-        <button
-          onClick={handleFinish}
-          className="flex-1 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl font-semibold hover:from-orange-600 hover:to-red-700 transition-all shadow-lg shadow-orange-900/30 flex items-center justify-center gap-2"
-        >
-          <Check className="w-4 h-4" /> {t.workout.finish}
-        </button>
-      </div>
+      {/* Bottom action bar — glass-2 sticky */}
+      <footer className="glass-2 border-t border-app flex-shrink-0 safe-bottom">
+        <div className="flex gap-2.5 px-4 py-3">
+          <Button
+            variant="secondary"
+            fullWidth
+            onClick={handleSaveDraft}
+            iconLeft={<Save className="h-4 w-4" />}
+          >
+            {language === 'es' ? 'Borrador' : 'Draft'}
+          </Button>
+          <Button
+            variant="primary"
+            fullWidth
+            onClick={handleFinish}
+            iconLeft={<Check className="h-4 w-4" />}
+          >
+            {t.workout.finish}
+          </Button>
+        </div>
+      </footer>
 
-      {/* Add Exercise Modal */}
-      {showAddExercise && (
-        <div className="absolute inset-0 bg-gray-900/95 z-10 flex flex-col">
-          <div className="bg-gray-800 border-b border-gray-700 p-4 flex items-center gap-3">
-            <button onClick={() => { setShowAddExercise(false); setExerciseSearch(''); }} className="text-gray-400 hover:text-white">
-              <X className="w-5 h-5" />
-            </button>
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                value={exerciseSearch}
-                onChange={e => setExerciseSearch(e.target.value)}
-                placeholder={t.workout.searchExercises}
-                className="w-full pl-9 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-orange-500"
-                autoFocus
-              />
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {filteredExercises.length === 0 && (
-              <p className="text-center text-gray-500 text-sm py-8">{t.workout.noExercisesFound}</p>
-            )}
-            {filteredExercises.map((ex: Exercise) => {
-              const alreadyAdded = session.exercises.some(e => e.exerciseId === ex.id);
-              return (
+      {/* Add Exercise — bottom sheet */}
+      <Sheet
+        open={showAddExercise}
+        onClose={() => { setShowAddExercise(false); setExerciseSearch(''); }}
+        title={t.workout.addExercise}
+      >
+        <div className="relative mb-3">
+          <Search
+            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
+            aria-hidden="true"
+          />
+          <input
+            type="text"
+            value={exerciseSearch}
+            onChange={e => setExerciseSearch(e.target.value)}
+            placeholder={t.workout.searchExercises}
+            className="block w-full rounded-[12px] border border-app bg-surface-2 py-2.5 pl-10 pr-3 text-[14px] text-primary placeholder:text-muted focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            autoFocus
+          />
+        </div>
+        <ul className="space-y-1.5">
+          {filteredExercises.length === 0 && (
+            <li className="py-8 text-center text-[13px] text-muted">{t.workout.noExercisesFound}</li>
+          )}
+          {filteredExercises.map((ex: Exercise) => {
+            const alreadyAdded = session.exercises.some(e => e.exerciseId === ex.id);
+            return (
+              <li key={ex.id}>
                 <button
-                  key={ex.id}
+                  type="button"
                   onClick={() => !alreadyAdded && addExercise(ex.id)}
                   disabled={alreadyAdded}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-[14px] border p-3 text-left',
+                    'transition-colors duration-150',
                     alreadyAdded
-                      ? 'border-gray-700 bg-gray-800/30 opacity-50 cursor-not-allowed'
-                      : 'border-gray-700 bg-gray-800 hover:border-orange-500 hover:bg-gray-700'
-                  }`}
+                      ? 'cursor-not-allowed border-app bg-surface-2 opacity-50'
+                      : 'border-app bg-surface-2 hover:border-accent hover:bg-surface-3 active:scale-[0.99]',
+                  )}
                 >
                   <img
                     src={ex.imageUrl}
                     alt={ex.name}
-                    className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                    onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=100&q=60'; }}
+                    className="h-11 w-11 flex-shrink-0 rounded-[10px] object-cover"
+                    onError={e => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }}
                   />
-                  <div>
-                    <div className="text-white font-medium text-sm">{ex.name}</div>
-                    <div className="text-orange-400 text-xs">{ex.primaryMuscles.map((m: MuscleGroup) => muscleLabelMap[m] || m).join(', ')}</div>
-                    <div className="text-gray-500 text-xs">{ex.secondaryMuscles.map((m: MuscleGroup) => muscleLabelMap[m] || m).join(' · ')}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[14px] font-medium text-primary">{ex.name}</div>
+                    <div className="text-[11px] text-accent">
+                      {ex.primaryMuscles.map((m: MuscleGroup) => muscleLabelMap[m] || m).join(', ')}
+                    </div>
+                    {ex.secondaryMuscles.length > 0 && (
+                      <div className="mt-0.5 text-[10px] text-muted truncate">
+                        {ex.secondaryMuscles.map((m: MuscleGroup) => muscleLabelMap[m] || m).join(' · ')}
+                      </div>
+                    )}
                   </div>
-                  {alreadyAdded && <span className="ml-auto text-xs text-gray-500">{language === 'es' ? 'Ya añadido' : 'Added'}</span>}
+                  {alreadyAdded && (
+                    <span className="text-[11px] text-muted">{language === 'es' ? 'Añadido' : 'Added'}</span>
+                  )}
                 </button>
-              );
-            })}
-          </div>
+              </li>
+            );
+          })}
+        </ul>
+      </Sheet>
+
+      {/* Delete confirmation */}
+      <Dialog
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        title={language === 'es' ? 'Eliminar entrenamiento' : 'Delete workout'}
+        description={language === 'es'
+          ? '¿Seguro que quieres eliminar este entrenamiento? No se puede deshacer.'
+          : 'Are you sure you want to delete this workout? This cannot be undone.'}
+      >
+        <div className="mt-2 flex gap-2">
+          <Button variant="ghost" fullWidth onClick={() => setConfirmDelete(false)}>
+            {t.general.cancel}
+          </Button>
+          <Button
+            variant="danger"
+            fullWidth
+            onClick={() => { onDelete?.(session.id); setConfirmDelete(false); onClose(); }}
+            iconLeft={<Trash2 className="h-4 w-4" />}
+          >
+            {t.general.delete}
+          </Button>
         </div>
-      )}
+      </Dialog>
     </div>
   );
 }

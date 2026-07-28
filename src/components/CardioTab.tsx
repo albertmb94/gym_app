@@ -8,6 +8,16 @@ import {
   Activity, Clock, Heart, Flame, Plus, Trash2, X, Check, Calendar,
   MapPin, Mountain, Upload, Map as MapIcon, ChevronDown, ChevronUp
 } from 'lucide-react';
+import { Card } from './ui/Card';
+import { Button } from './ui/Button';
+import { EmptyState } from './ui/EmptyState';
+import { IconButton } from './ui/IconButton';
+import { Sheet } from './ui/Sheet';
+import { Field, TextInput } from './ui/Field';
+import { useLanguage } from '../contexts/LanguageContext';
+import { format } from 'date-fns';
+import { es, enUS } from 'date-fns/locale';
+import { cn } from '../utils/cn';
 
 interface CardioTabProps {
   cardioSessions: CardioSession[];
@@ -17,7 +27,6 @@ interface CardioTabProps {
   estimateCalories: (cardioTypeId: string, duration: number, avgHR: number) => number;
 }
 
-// Sports that may benefit from a GPX track
 const OUTDOOR_SPORTS = ['running', 'cycling', 'walking', 'hiit'];
 
 export default function CardioTab({
@@ -27,6 +36,8 @@ export default function CardioTab({
   onDeleteSession,
   estimateCalories,
 }: CardioTabProps) {
+  const { t, language } = useLanguage();
+  const dateLocale = language === 'es' ? es : enUS;
   const [showForm, setShowForm] = useState(false);
   const [selectedCardio, setSelectedCardio] = useState<string>('running');
   const [duration, setDuration] = useState<number>(30);
@@ -79,7 +90,7 @@ export default function CardioTab({
       const text = ev.target?.result as string;
       const route = parseGpx(text);
       if (!route) {
-        setGpxError('No se pudo leer el archivo GPX. Verifica el formato.');
+        setGpxError(t.cardio.gpxError);
         return;
       }
       setGpxRoute(route);
@@ -92,7 +103,7 @@ export default function CardioTab({
         if (minutes > 0 && minutes < 600) setDuration(minutes);
       }
     };
-    reader.onerror = () => setGpxError('Error al leer el archivo');
+    reader.onerror = () => setGpxError(t.cardio.gpxError);
     reader.readAsText(file);
     e.target.value = '';
   };
@@ -101,7 +112,7 @@ export default function CardioTab({
   const selectedCardioType = CARDIO_TYPES.find(c => c.id === selectedCardio);
   const isOutdoorSport = OUTDOOR_SPORTS.includes(selectedCardio);
 
-  // Calculate weekly stats
+  // Weekly stats
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
   const weekSessions = cardioSessions.filter(s => new Date(s.date) >= weekAgo);
@@ -109,267 +120,265 @@ export default function CardioTab({
   const weeklyCalories = weekSessions.reduce((sum, s) => sum + s.caloriesBurned, 0);
 
   const getHeartRateZone = (hr: number): { zone: string; color: string } => {
-    if (!physicalProfile) return { zone: 'N/A', color: 'text-gray-400' };
+    if (!physicalProfile) return { zone: 'N/A', color: 'text-muted' };
     const { maxHeartRate, restingHeartRate } = physicalProfile;
     const hrReserve = maxHeartRate - restingHeartRate;
     const intensity = ((hr - restingHeartRate) / hrReserve) * 100;
 
-    if (intensity < 60) return { zone: 'Zona 1', color: 'text-gray-400' };
-    if (intensity < 70) return { zone: 'Zona 2', color: 'text-blue-400' };
-    if (intensity < 80) return { zone: 'Zona 3', color: 'text-green-400' };
-    if (intensity < 90) return { zone: 'Zona 4', color: 'text-yellow-400' };
-    return { zone: 'Zona 5', color: 'text-red-400' };
+    if (intensity < 60) return { zone: t.cardio.heartRateZones + ' 1', color: 'text-muted' };
+    if (intensity < 70) return { zone: t.cardio.heartRateZones + ' 2', color: 'text-[color:var(--info)]' };
+    if (intensity < 80) return { zone: t.cardio.heartRateZones + ' 3', color: 'text-[color:var(--success)]' };
+    if (intensity < 90) return { zone: t.cardio.heartRateZones + ' 4', color: 'text-[color:var(--warning)]' };
+    return { zone: t.cardio.heartRateZones + ' 5', color: 'text-[color:var(--danger)]' };
   };
 
   return (
-    <div className="p-4 pb-24">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold flex items-center gap-2">
-          <Activity className="text-green-400" />
-          Cardio
-        </h2>
-        <button
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <h1 className="flex items-center gap-2 text-[24px] font-semibold text-primary tracking-tight">
+          <Activity className="text-accent" aria-hidden="true" />
+          {t.cardio.title}
+        </h1>
+        <Button
+          variant="primary"
+          size="md"
           onClick={() => setShowForm(true)}
-          className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg flex items-center gap-2"
+          iconLeft={<Plus className="h-4 w-4" />}
         >
-          <Plus size={20} />
-          Nueva Sesión
-        </button>
+          {t.cardio.newSession}
+        </Button>
       </div>
 
-      {/* Weekly Stats */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        <div className="bg-gray-800 rounded-xl p-4">
-          <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
-            <Clock size={16} />
-            Esta semana
+      {/* Weekly stats */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="glass-1 p-4">
+          <div className="mb-1 flex items-center gap-2 text-[13px] text-secondary">
+            <Clock size={16} aria-hidden="true" />
+            {t.stats.thisWeek}
           </div>
-          <div className="text-2xl font-bold">{weeklyMinutes} min</div>
-          <div className="text-xs text-gray-500">{weekSessions.length} sesiones</div>
+          <div className="text-[22px] font-semibold text-primary tabular-nums tracking-tight">{weeklyMinutes} min</div>
+          <div className="text-[11px] text-muted">{weekSessions.length} {t.cardio.heartRateZones && weekSessions.length === 1 ? 'sesión' : 'sesiones'}</div>
         </div>
-        <div className="bg-gray-800 rounded-xl p-4">
-          <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
-            <Flame size={16} />
-            Calorías quemadas
+        <div className="glass-1 p-4">
+          <div className="mb-1 flex items-center gap-2 text-[13px] text-secondary">
+            <Flame size={16} aria-hidden="true" className="text-accent" />
+            {t.cardio.calories}
           </div>
-          <div className="text-2xl font-bold text-orange-400">{weeklyCalories}</div>
-          <div className="text-xs text-gray-500">kcal esta semana</div>
+          <div className="text-[22px] font-semibold text-accent tabular-nums tracking-tight">{weeklyCalories.toLocaleString()}</div>
+          <div className="text-[11px] text-muted">kcal {t.stats.thisWeek.toLowerCase()}</div>
         </div>
       </div>
 
-      {/* Form Modal — full-screen on mobile to avoid nav-bar overlap */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/70 z-[60] flex items-stretch sm:items-center justify-center sm:p-4">
-          <div className="bg-gray-800 sm:rounded-xl w-full sm:max-w-md flex flex-col max-h-screen sm:max-h-[90vh]">
-            {/* Header */}
-            <div className="p-4 border-b border-gray-700 flex items-center justify-between flex-shrink-0">
-              <h3 className="text-lg font-semibold">Nueva Sesión de Cardio</h3>
-              <button
-                onClick={() => { setShowForm(false); resetForm(); }}
-                className="p-2 hover:bg-gray-700 rounded-lg"
-              >
-                <X size={20} />
-              </button>
-            </div>
+      {/* Form — bottom sheet */}
+      <Sheet
+        open={showForm}
+        onClose={() => { setShowForm(false); resetForm(); }}
+        title={t.cardio.newSession}
+        footer={
+          <Button
+            variant="primary"
+            fullWidth
+            size="lg"
+            onClick={handleSave}
+            iconLeft={<Check className="h-4 w-4" />}
+          >
+            {t.cardio.logSession}
+          </Button>
+        }
+      >
+        <div className="space-y-4">
+          <Field label={language === 'es' ? 'Fecha' : 'Date'}>
+            {(id) => (
+              <input
+                id={id}
+                type="date"
+                value={sessionDate}
+                onChange={(e) => setSessionDate(e.target.value)}
+                className="block w-full rounded-[12px] border border-app bg-surface-2 px-3.5 py-3 text-[15px] text-primary focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              />
+            )}
+          </Field>
 
-            {/* Scrollable body */}
-            <div className="p-4 space-y-4 overflow-y-auto flex-1">
-              {/* Date */}
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">Fecha</label>
-                <input
-                  type="date"
-                  value={sessionDate}
-                  onChange={(e) => setSessionDate(e.target.value)}
-                  className="w-full bg-gray-700 rounded-lg px-3 py-2"
-                />
-              </div>
-
-              {/* Cardio Type Selection */}
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">Tipo de cardio</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {CARDIO_TYPES.map((cardio) => (
-                    <button
-                      key={cardio.id}
-                      onClick={() => {
-                        setSelectedCardio(cardio.id);
-                        if (!OUTDOOR_SPORTS.includes(cardio.id)) setGpxRoute(null);
-                      }}
-                      className={`p-3 rounded-lg text-center transition-all ${
-                        selectedCardio === cardio.id
-                          ? 'bg-green-600 ring-2 ring-green-400'
-                          : 'bg-gray-700 hover:bg-gray-600'
-                      }`}
-                    >
-                      <span className="text-2xl block mb-1">{cardio.icon}</span>
-                      <span className="text-xs">{cardio.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* GPX Route Upload — only outdoor sports */}
-              {isOutdoorSport && (
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2 flex items-center gap-2">
-                    <MapIcon size={16} /> Ruta GPX (opcional)
-                  </label>
-                  {!gpxRoute ? (
-                    <>
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full py-3 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center gap-2 text-sm border-2 border-dashed border-gray-600"
-                      >
-                        <Upload size={18} />
-                        Cargar archivo .gpx
-                      </button>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".gpx,application/gpx+xml,application/xml,text/xml"
-                        onChange={handleGpxUpload}
-                        className="hidden"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Sube una ruta de Strava, Garmin, Komoot, etc.
-                      </p>
-                    </>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="bg-gray-700 rounded-lg p-3 flex items-center justify-between">
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium truncate">
-                            {gpxRoute.name || 'Ruta sin nombre'}
-                          </div>
-                          <div className="flex gap-3 text-xs text-gray-400 mt-1 flex-wrap">
-                            <span className="flex items-center gap-1">
-                              <MapPin size={12} /> {gpxRoute.distanceKm} km
-                            </span>
-                            {gpxRoute.elevationGain !== undefined && (
-                              <span className="flex items-center gap-1">
-                                <Mountain size={12} /> +{gpxRoute.elevationGain} m
-                              </span>
-                            )}
-                            <span>{gpxRoute.points.length} pts</span>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => setGpxRoute(null)}
-                          className="p-2 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded ml-2"
-                          title="Quitar ruta"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                      <MapRoute route={gpxRoute} height={200} />
-                    </div>
+          <div>
+            <label className="mb-2 block text-[13px] font-medium text-secondary">
+              {language === 'es' ? 'Tipo de cardio' : 'Cardio type'}
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {CARDIO_TYPES.map((cardio) => (
+                <button
+                  key={cardio.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedCardio(cardio.id);
+                    if (!OUTDOOR_SPORTS.includes(cardio.id)) setGpxRoute(null);
+                  }}
+                  className={cn(
+                    'rounded-[14px] p-3 text-center transition-all duration-200 ease-apple',
+                    'active:scale-95',
+                    selectedCardio === cardio.id
+                      ? 'bg-accent-soft border border-accent'
+                      : 'bg-surface-2 border border-app hover:bg-surface-3',
                   )}
-                  {gpxError && <p className="text-xs text-red-400 mt-1">{gpxError}</p>}
+                >
+                  <span className="mb-1 block text-2xl" aria-hidden="true">{cardio.icon}</span>
+                  <span className="text-[12px] text-primary">{cardio.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* GPX Route — only outdoor sports */}
+          {isOutdoorSport && (
+            <div>
+              <label className="mb-2 flex items-center gap-2 text-[13px] font-medium text-secondary">
+                <MapIcon size={14} aria-hidden="true" /> {t.cardio.uploadGpx}
+              </label>
+              {!gpxRoute ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex w-full items-center justify-center gap-2 rounded-[14px] border-2 border-dashed border-app py-3 text-[13px] text-secondary hover:border-accent hover:text-accent hover:bg-accent-soft/40 transition-colors"
+                  >
+                    <Upload size={18} aria-hidden="true" />
+                    {language === 'es' ? 'Cargar archivo .gpx' : 'Upload .gpx file'}
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".gpx,application/gpx+xml,application/xml,text/xml"
+                    onChange={handleGpxUpload}
+                    className="hidden"
+                  />
+                  <p className="mt-1 text-[11px] text-muted">
+                    {language === 'es' ? 'Sube una ruta de Strava, Garmin, Komoot, etc.' : 'Upload a route from Strava, Garmin, Komoot, etc.'}
+                  </p>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between rounded-[14px] bg-surface-2 p-3 border border-app">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[14px] font-medium text-primary">
+                        {gpxRoute.name || (language === 'es' ? 'Ruta sin nombre' : 'Unnamed route')}
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-muted">
+                        <span className="flex items-center gap-1">
+                          <MapPin size={12} aria-hidden="true" /> {gpxRoute.distanceKm} km
+                        </span>
+                        {gpxRoute.elevationGain !== undefined && (
+                          <span className="flex items-center gap-1">
+                            <Mountain size={12} aria-hidden="true" /> +{gpxRoute.elevationGain} m
+                          </span>
+                        )}
+                        <span>{gpxRoute.points.length} pts</span>
+                      </div>
+                    </div>
+                    <IconButton
+                      label={language === 'es' ? 'Quitar ruta' : 'Remove route'}
+                      icon={<X size={16} aria-hidden="true" />}
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setGpxRoute(null)}
+                    />
+                  </div>
+                  <MapRoute route={gpxRoute} height={200} />
                 </div>
               )}
-
-              {/* Duration */}
-              <div>
-                <label className="block text-sm text-gray-400 mb-2 flex items-center gap-2">
-                  <Clock size={16} />
-                  Duración (minutos)
-                </label>
-                <input
-                  type="number"
-                  value={duration}
-                  onChange={(e) => setDuration(parseInt(e.target.value) || 0)}
-                  onFocus={(e) => e.target.select()}
-                  className="w-full bg-gray-700 rounded-lg px-3 py-3 text-xl text-center"
-                  min={1}
-                  max={300}
-                />
-                <div className="flex justify-center gap-2 mt-2 flex-wrap">
-                  {[15, 30, 45, 60, 90].map((mins) => (
-                    <button
-                      key={mins}
-                      onClick={() => setDuration(mins)}
-                      className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm"
-                    >
-                      {mins}m
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Average Heart Rate */}
-              <div>
-                <label className="block text-sm text-gray-400 mb-2 flex items-center gap-2">
-                  <Heart size={16} />
-                  Frecuencia cardíaca media (bpm)
-                </label>
-                <input
-                  type="number"
-                  value={avgHeartRate}
-                  onChange={(e) => setAvgHeartRate(parseInt(e.target.value) || 0)}
-                  onFocus={(e) => e.target.select()}
-                  className="w-full bg-gray-700 rounded-lg px-3 py-3 text-xl text-center"
-                  min={40}
-                  max={220}
-                />
-                {physicalProfile && (
-                  <div className="flex justify-between mt-2 text-xs text-gray-400">
-                    <span>Reposo: {physicalProfile.restingHeartRate}</span>
-                    <span className={getHeartRateZone(avgHeartRate).color}>
-                      {getHeartRateZone(avgHeartRate).zone}
-                    </span>
-                    <span>Max: {physicalProfile.maxHeartRate}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Estimated Calories */}
-              <div className="bg-gray-700 rounded-lg p-4 text-center">
-                <div className="text-gray-400 text-sm mb-1">Calorías estimadas</div>
-                <div className="text-3xl font-bold text-orange-400 flex items-center justify-center gap-2">
-                  <Flame />
-                  {estimatedCalories} kcal
-                </div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {selectedCardioType?.name} • {duration} min • {avgHeartRate} bpm
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">Notas (opcional)</label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full bg-gray-700 rounded-lg px-3 py-2 h-20 resize-none"
-                  placeholder="¿Cómo te sentiste?"
-                />
-              </div>
+              {gpxError && <p className="mt-1 text-[11px] text-[color:var(--danger)]">{gpxError}</p>}
             </div>
+          )}
 
-            {/* Sticky footer with save button — always visible */}
-            <div className="p-4 border-t border-gray-700 bg-gray-800 flex-shrink-0 safe-area-bottom">
+          <Field label={t.cardio.duration}>
+            {(id) => (
+              <TextInput
+                id={id}
+                type="number"
+                value={duration}
+                onChange={(e) => setDuration(parseInt(e.target.value) || 0)}
+                onFocus={(e) => e.target.select()}
+                min={1}
+                max={300}
+                className="text-center text-[20px] font-semibold tabular-nums"
+              />
+            )}
+          </Field>
+          <div className="-mt-2 flex flex-wrap justify-center gap-2">
+            {[15, 30, 45, 60, 90].map((mins) => (
               <button
-                onClick={handleSave}
-                className="w-full bg-green-600 hover:bg-green-700 py-3 rounded-xl font-semibold flex items-center justify-center gap-2"
+                key={mins}
+                type="button"
+                onClick={() => setDuration(mins)}
+                className={cn(
+                  'rounded-full px-3 py-1 text-[12px] font-medium transition-colors',
+                  duration === mins
+                    ? 'bg-accent text-on-accent'
+                    : 'bg-surface-2 text-secondary border border-app hover:bg-surface-3',
+                )}
               >
-                <Check size={20} />
-                Guardar Sesión
+                {mins}m
               </button>
+            ))}
+          </div>
+
+          <Field label={t.cardio.avgHeartRate}>
+            {(id) => (
+              <TextInput
+                id={id}
+                type="number"
+                value={avgHeartRate}
+                onChange={(e) => setAvgHeartRate(parseInt(e.target.value) || 0)}
+                onFocus={(e) => e.target.select()}
+                min={40}
+                max={220}
+                className="text-center text-[20px] font-semibold tabular-nums"
+              />
+            )}
+          </Field>
+          {physicalProfile && (
+            <div className="-mt-2 flex items-center justify-between text-[11px]">
+              <span className="text-muted">{t.profile.restingHR}: {physicalProfile.restingHeartRate}</span>
+              <span className={cn('font-semibold', getHeartRateZone(avgHeartRate).color)}>
+                {getHeartRateZone(avgHeartRate).zone}
+              </span>
+              <span className="text-muted">{t.profile.maxHR}: {physicalProfile.maxHeartRate}</span>
+            </div>
+          )}
+
+          <div className="rounded-[16px] glass-1 border border-accent/30 p-4 text-center" style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, transparent), color-mix(in srgb, var(--warning) 6%, transparent))' }}>
+            <div className="text-[12px] text-muted mb-1">{t.cardio.calories}</div>
+            <div className="text-[28px] font-semibold text-accent tabular-nums tracking-tight flex items-center justify-center gap-2">
+              <Flame className="h-5 w-5" aria-hidden="true" />
+              {estimatedCalories} kcal
+            </div>
+            <div className="mt-1 text-[11px] text-muted">
+              {selectedCardioType?.name} · {duration} min · {avgHeartRate} bpm
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Sessions List */}
+          <Field label={t.cardio.notes}>
+            {(id) => (
+              <textarea
+                id={id}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder={language === 'es' ? '¿Cómo te sentiste?' : 'How did you feel?'}
+                rows={3}
+                className="block w-full rounded-[12px] border border-app bg-surface-2 px-3.5 py-2.5 text-[14px] text-primary placeholder:text-muted focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent resize-none"
+              />
+            )}
+          </Field>
+        </div>
+      </Sheet>
+
+      {/* Sessions list */}
       <div className="space-y-3">
-        <h3 className="font-semibold text-gray-400">Historial</h3>
+        <h2 className="text-[14px] font-semibold text-secondary">{language === 'es' ? 'Historial' : 'History'}</h2>
         {sortedSessions.length === 0 ? (
-          <div className="bg-gray-800 rounded-xl p-8 text-center">
-            <Activity className="mx-auto text-gray-600 mb-3" size={48} />
-            <p className="text-gray-500">No hay sesiones de cardio registradas</p>
-            <p className="text-gray-600 text-sm mt-1">¡Añade tu primera sesión!</p>
-          </div>
+          <EmptyState
+            icon={<Activity className="h-6 w-6" />}
+            title={t.cardio.noSessions}
+            description={t.cardio.noSessionsDesc}
+          />
         ) : (
           sortedSessions.map((session) => {
             const cardioType = CARDIO_TYPES.find(c => c.id === session.cardioTypeId);
@@ -377,48 +386,49 @@ export default function CardioTab({
             const hasRoute = !!session.gpxRoute && session.gpxRoute.points.length > 0;
             const isExpanded = expandedRouteId === session.id;
             return (
-              <div key={session.id} className="bg-gray-800 rounded-xl p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <span className="text-3xl flex-shrink-0">{cardioType?.icon || '🏃'}</span>
+              <Card key={session.id} level="glass1" padding="md">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <span className="text-2xl flex-shrink-0" aria-hidden="true">{cardioType?.icon || '🏃'}</span>
                     <div className="min-w-0 flex-1">
-                      <h4 className="font-semibold truncate">{cardioType?.name || 'Cardio'}</h4>
-                      <div className="flex items-center gap-3 text-sm text-gray-400 mt-1 flex-wrap">
+                      <h3 className="text-[15px] font-semibold text-primary truncate">{cardioType?.name || 'Cardio'}</h3>
+                      <div className="mt-1 flex flex-wrap items-center gap-3 text-[12px] text-muted">
                         <span className="flex items-center gap-1">
-                          <Calendar size={14} />
-                          {new Date(session.date).toLocaleDateString('es-ES')}
+                          <Calendar size={12} aria-hidden="true" />
+                          {format(new Date(session.date), 'd MMM yyyy', { locale: dateLocale })}
                         </span>
                         <span className="flex items-center gap-1">
-                          <Clock size={14} />
+                          <Clock size={12} aria-hidden="true" />
                           {session.duration} min
                         </span>
                       </div>
                     </div>
                   </div>
-                  <button
+                  <IconButton
+                    label={t.general.delete}
+                    icon={<Trash2 size={16} aria-hidden="true" />}
+                    variant="ghost"
+                    size="sm"
                     onClick={() => onDeleteSession(session.id)}
-                    className="p-2 hover:bg-red-500/20 rounded-lg text-gray-400 hover:text-red-400 flex-shrink-0"
-                  >
-                    <Trash2 size={18} />
-                  </button>
+                  />
                 </div>
 
-                <div className="flex items-center gap-x-4 gap-y-1 mt-3 pt-3 border-t border-gray-700 flex-wrap">
-                  <div className="flex items-center gap-1 text-sm">
-                    <Heart size={16} className="text-red-400" />
-                    <span>{session.averageHeartRate} bpm</span>
-                    <span className={`text-xs ${hrZone.color}`}>({hrZone.zone})</span>
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-app pt-3">
+                  <div className="flex items-center gap-1 text-[13px] text-primary">
+                    <Heart size={14} aria-hidden="true" className="text-[color:var(--danger)]" />
+                    <span className="tabular-nums">{session.averageHeartRate} bpm</span>
+                    <span className={cn('text-[11px]', hrZone.color)}>({hrZone.zone})</span>
                   </div>
-                  <div className="flex items-center gap-1 text-sm text-orange-400 font-semibold">
-                    <Flame size={16} />
+                  <div className="flex items-center gap-1 text-[13px] text-accent font-semibold tabular-nums">
+                    <Flame size={14} aria-hidden="true" />
                     <span>{session.caloriesBurned} kcal</span>
                   </div>
                   {hasRoute && (
-                    <div className="flex items-center gap-1 text-sm text-green-400">
-                      <MapPin size={14} />
+                    <div className="flex items-center gap-1 text-[13px] text-[color:var(--info)] tabular-nums">
+                      <MapPin size={12} aria-hidden="true" />
                       <span>{session.gpxRoute!.distanceKm} km</span>
                       {session.gpxRoute!.elevationGain !== undefined && (
-                        <span className="text-xs text-gray-400">+{session.gpxRoute!.elevationGain}m</span>
+                        <span className="text-[11px] text-muted">+{session.gpxRoute!.elevationGain}m</span>
                       )}
                     </div>
                   )}
@@ -426,12 +436,13 @@ export default function CardioTab({
 
                 {hasRoute && (
                   <button
+                    type="button"
                     onClick={() => setExpandedRouteId(isExpanded ? null : session.id)}
-                    className="mt-3 w-full flex items-center justify-center gap-2 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors"
+                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-[12px] bg-surface-2 hover:bg-surface-3 py-2 text-[13px] font-medium text-primary transition-colors"
                   >
-                    <MapIcon size={16} />
-                    {isExpanded ? 'Ocultar mapa' : 'Ver ruta en mapa'}
-                    {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    <MapIcon size={14} aria-hidden="true" />
+                    {isExpanded ? (language === 'es' ? 'Ocultar mapa' : 'Hide map') : (language === 'es' ? 'Ver ruta en mapa' : 'View map')}
+                    {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </button>
                 )}
 
@@ -442,9 +453,9 @@ export default function CardioTab({
                 )}
 
                 {session.notes && (
-                  <p className="text-sm text-gray-400 mt-2 italic">"{session.notes}"</p>
+                  <p className="mt-2 text-[13px] text-secondary italic">"{session.notes}"</p>
                 )}
-              </div>
+              </Card>
             );
           })
         )}

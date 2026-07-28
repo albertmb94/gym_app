@@ -3,12 +3,30 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#0b0f17" />
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)" />
+    <meta name="color-scheme" content="dark light" />
     <meta name="description" content="Registra entrenamientos de fuerza y cardio, plantillas, progreso y récords personales." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>GymTracker Pro</title>
+    <script>
+      // Aplica el tema antes del primer paint para evitar el flash de tema incorrecto.
+      (function () {
+        try {
+          var saved = localStorage.getItem('gymtracker.theme');
+          var theme = saved === 'light' || saved === 'dark'
+            ? saved
+            : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+          document.documentElement.classList.remove('theme-dark', 'theme-light');
+          document.documentElement.classList.add('theme-' + theme);
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (_) {}
+      })();
+    </script>
   </head>
   <body>
-    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[300] focus:rounded-lg focus:bg-orange-500 focus:px-3 focus:py-2 focus:text-white">Saltar al contenido</a>
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[300] focus:rounded-lg focus:bg-accent focus:px-3 focus:py-2 focus:text-white">Saltar al contenido</a>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

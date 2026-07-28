@@ -115,9 +115,9 @@ export default function NumberPicker({
   const colors = colorMap[color] || colorMap.purple;
 
   return (
-    <div className="bg-gray-700/50 rounded-xl p-3 select-none">
+    <div className="bg-surface-2 rounded-[14px] p-3 select-none border border-app">
       {label && (
-        <div className="text-xs text-gray-400 mb-2 text-center">{label}</div>
+        <div className="text-[11px] text-muted mb-2 text-center">{label}</div>
       )}
 
       {/* Top row: -, value input, + */}
@@ -129,7 +129,7 @@ export default function NumberPicker({
           onTouchStart={(e) => { e.preventDefault(); startHold('dec'); }}
           onTouchEnd={stopHold}
           disabled={value <= min}
-          className={`w-11 h-11 rounded-full ${colors.bg} hover:opacity-90 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white shadow-lg transition-transform`}
+          className={`h-11 w-11 rounded-full ${colors.bg} hover:opacity-90 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white shadow-[0_4px_14px_-4px_rgba(0,0,0,0.3)] transition-transform`}
           aria-label="Disminuir"
         >
           <Minus size={20} />
@@ -144,11 +144,11 @@ export default function NumberPicker({
             onFocus={handleInputFocus}
             onBlur={handleInputBlur}
             onKeyDown={handleKeyDown}
-            className="bg-transparent text-white text-3xl font-bold text-center w-24 focus:outline-none focus:bg-gray-800 rounded-lg py-1"
+            className="bg-transparent text-primary text-[28px] font-semibold text-center w-24 focus-visible:outline-none focus-visible:bg-surface-3 rounded-[10px] py-1 tabular-nums tracking-tight"
             autoComplete="off"
           />
           {suffix && (
-            <span className="text-gray-400 text-base font-medium">{suffix.trim()}</span>
+            <span className="text-[15px] text-secondary font-medium">{suffix.trim()}</span>
           )}
         </div>
 
@@ -159,7 +159,7 @@ export default function NumberPicker({
           onTouchStart={(e) => { e.preventDefault(); startHold('inc'); }}
           onTouchEnd={stopHold}
           disabled={value >= max}
-          className={`w-11 h-11 rounded-full ${colors.bg} hover:opacity-90 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white shadow-lg transition-transform`}
+          className={`h-11 w-11 rounded-full ${colors.bg} hover:opacity-90 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white shadow-[0_4px_14px_-4px_rgba(0,0,0,0.3)] transition-transform`}
           aria-label="Aumentar"
         >
           <Plus size={20} />
@@ -168,7 +168,7 @@ export default function NumberPicker({
 
       {/* Slider */}
       <div className="relative px-1">
-        <div className="relative h-2 bg-gray-600 rounded-full overflow-hidden">
+        <div className="relative h-2 bg-surface-3 rounded-full overflow-hidden">
           <div
             className={`absolute left-0 top-0 h-full ${colors.track} rounded-full transition-all`}
             style={{ width: `${percentage}%` }}
@@ -186,7 +186,7 @@ export default function NumberPicker({
         />
         {/* Custom thumb visualization */}
         <div
-          className="absolute top-1/2 w-5 h-5 bg-white rounded-full shadow-lg border-2 border-gray-300 pointer-events-none transition-all"
+          className="pointer-events-none absolute top-1/2 h-5 w-5 rounded-full bg-primary shadow-[0_2px_8px_rgba(0,0,0,0.2)] border-2 border-canvas transition-all"
           style={{
             left: `calc(${percentage}% )`,
             transform: 'translate(-50%, -50%)',
@@ -195,7 +195,7 @@ export default function NumberPicker({
       </div>
 
       {/* Min/Max labels */}
-      <div className="flex justify-between mt-2 text-[10px] text-gray-500">
+      <div className="mt-2 flex justify-between text-[10px] text-muted">
         <span>{min}{suffix}</span>
         <span>{max}{suffix}</span>
       </div>

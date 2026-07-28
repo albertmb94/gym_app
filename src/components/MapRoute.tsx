@@ -7,6 +7,7 @@ interface MapRouteProps {
   route: GpxRoute;
   height?: string | number;
   interactive?: boolean;
+  emptyMessage?: string;
 }
 
 /**
@@ -16,7 +17,7 @@ interface MapRouteProps {
  * We use vanilla Leaflet (instead of react-leaflet) to avoid
  * version coupling issues and keep the bundle small.
  */
-export default function MapRoute({ route, height = 280, interactive = true }: MapRouteProps) {
+export default function MapRoute({ route, height = 280, interactive = true, emptyMessage = 'Sin puntos GPX para mostrar' }: MapRouteProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
 
@@ -51,7 +52,7 @@ export default function MapRoute({ route, height = 280, interactive = true }: Ma
     // Build polyline
     const latlngs = route.points.map((p) => [p.lat, p.lng] as [number, number]);
     const polyline = L.polyline(latlngs, {
-      color: '#f97316',
+      color: '#0A84FF',
       weight: 4,
       opacity: 0.9,
     }).addTo(map);
@@ -91,10 +92,10 @@ export default function MapRoute({ route, height = 280, interactive = true }: Ma
   if (route.points.length === 0) {
     return (
       <div
-        className="bg-gray-700 rounded-lg flex items-center justify-center text-gray-400 text-sm"
+        className="rounded-[14px] flex items-center justify-center bg-surface-2 text-muted text-[13px] border border-app"
         style={{ height }}
       >
-        Sin puntos GPX para mostrar
+        {emptyMessage}
       </div>
     );
   }

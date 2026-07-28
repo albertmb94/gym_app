@@ -8,6 +8,8 @@ import {
 } from 'date-fns';
 import { es, enUS } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Activity } from 'lucide-react';
+import { IconButton } from './ui/IconButton';
+import { cn } from '../utils/cn';
 
 interface Props {
   sessions: WorkoutSession[];
@@ -27,7 +29,6 @@ export default function MonthCalendar({ sessions, cardioSessions }: Props) {
     return eachDayOfInterval({ start: gridStart, end: gridEnd });
   }, [month]);
 
-  // Per-day indicators: distinct strength workout-type colours + cardio flag
   const dayInfo = useMemo(() => {
     const map = new Map<string, { types: Set<string>; cardio: boolean }>();
     const key = (d: Date) => format(d, 'yyyy-MM-dd');
@@ -49,7 +50,6 @@ export default function MonthCalendar({ sessions, cardioSessions }: Props) {
 
   const dayLabels = (t.days as readonly string[]).map(d => d.slice(0, 1));
 
-  // Workout types actually present this month (for a compact, relevant legend)
   const legendTypes = useMemo(() => {
     const present = new Set<string>();
     let hasCardio = false;
@@ -63,36 +63,37 @@ export default function MonthCalendar({ sessions, cardioSessions }: Props) {
   }, [days, month, dayInfo]);
 
   return (
-    <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
-      {/* Month slider */}
-      <div className="flex items-center justify-between mb-3">
-        <button
+    <div className="glass-1 p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <IconButton
+          label={language === 'es' ? 'Mes anterior' : 'Previous month'}
+          icon={<ChevronLeft className="h-5 w-5" aria-hidden="true" />}
           onClick={() => setMonth(m => subMonths(m, 1))}
-          className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <h3 className="text-white font-semibold capitalize">
+          variant="ghost"
+          size="sm"
+        />
+        <h3 className="text-[15px] font-semibold text-primary tracking-tight capitalize">
           {format(month, 'MMMM yyyy', { locale: dateLocale })}
         </h3>
-        <button
+        <IconButton
+          label={language === 'es' ? 'Mes siguiente' : 'Next month'}
+          icon={<ChevronRight className="h-5 w-5" aria-hidden="true" />}
           onClick={() => setMonth(m => addMonths(m, 1))}
+          variant="ghost"
+          size="sm"
           disabled={isSameMonth(month, new Date()) || month > new Date()}
-          className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
+        />
       </div>
 
-      {/* Weekday headers */}
-      <div className="grid grid-cols-7 gap-1 mb-1">
+      <div className="mb-1 grid grid-cols-7 gap-1.5">
         {dayLabels.map((d, i) => (
-          <div key={i} className="text-center text-gray-500 text-xs font-medium">{d}</div>
+          <div key={i} className="text-center text-[11px] font-semibold text-muted">
+            {d}
+          </div>
         ))}
       </div>
 
-      {/* Day grid */}
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-1.5">
         {days.map((day, i) => {
           const info = dayInfo.get(format(day, 'yyyy-MM-dd'));
           const inMonth = isSameMonth(day, month);
@@ -102,28 +103,36 @@ export default function MonthCalendar({ sessions, cardioSessions }: Props) {
           return (
             <div
               key={i}
-              className={`aspect-square rounded-lg flex flex-col items-center justify-center relative ${
-                today ? 'ring-2 ring-orange-500' : ''
-              } ${inMonth ? 'bg-gray-700/40' : 'bg-transparent'}`}
+              className={cn(
+                'relative flex aspect-square flex-col items-center justify-center rounded-[10px]',
+                'transition-colors duration-200 ease-apple',
+                today && 'ring-2 ring-accent',
+                inMonth
+                  ? 'bg-surface-2 border border-app'
+                  : 'bg-transparent',
+              )}
             >
-              <span className={`text-xs font-medium leading-none ${inMonth ? 'text-gray-300' : 'text-gray-600'}`}>
+              <span className={cn(
+                'text-[12px] font-medium tabular-nums leading-none',
+                inMonth ? 'text-primary' : 'text-disabled',
+              )}>
                 {day.getDate()}
               </span>
               {(types.length > 0 || hasCardio) && (
-                <div className="flex items-center justify-center gap-0.5 mt-1 flex-wrap max-w-full px-0.5">
+                <div className="mt-1 flex flex-wrap items-center justify-center gap-0.5 max-w-full px-0.5">
                   {types.map(ty => (
                     <span
                       key={ty}
-                      className="w-1.5 h-1.5 rounded-full"
+                      className="h-1.5 w-1.5 rounded-full"
                       style={{ backgroundColor: WORKOUT_TYPE_COLORS[ty] || '#9ca3af' }}
                       title={WORKOUT_TYPE_LABELS[ty] || ty}
                     />
                   ))}
                   {hasCardio && (
                     <span
-                      className="w-1.5 h-1.5 rounded-full"
+                      className="h-1.5 w-1.5 rounded-full"
                       style={{ backgroundColor: CARDIO_COLOR }}
-                      title={language === 'es' ? 'Cardio' : 'Cardio'}
+                      title="Cardio"
                     />
                   )}
                 </div>
@@ -133,20 +142,19 @@ export default function MonthCalendar({ sessions, cardioSessions }: Props) {
         })}
       </div>
 
-      {/* Legend */}
       {(legendTypes.types.length > 0 || legendTypes.hasCardio) && (
-        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 pt-3 border-t border-gray-700">
+        <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 border-t border-app pt-3">
           {legendTypes.types.map(ty => (
             <div key={ty} className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: WORKOUT_TYPE_COLORS[ty] || '#9ca3af' }} />
-              <span className="text-gray-400 text-xs">{WORKOUT_TYPE_LABELS[ty] || ty}</span>
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: WORKOUT_TYPE_COLORS[ty] || '#9ca3af' }} />
+              <span className="text-[11px] text-muted">{WORKOUT_TYPE_LABELS[ty] || ty}</span>
             </div>
           ))}
           {legendTypes.hasCardio && (
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CARDIO_COLOR }} />
-              <span className="text-gray-400 text-xs flex items-center gap-1">
-                <Activity className="w-3 h-3" /> Cardio
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: CARDIO_COLOR }} />
+              <span className="text-[11px] text-muted flex items-center gap-1">
+                <Activity className="h-3 w-3" /> Cardio
               </span>
             </div>
           )}

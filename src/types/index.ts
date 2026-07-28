@@ -17,7 +17,7 @@ export type MuscleGroup =
 
 export type WorkoutType = 'push' | 'pull' | 'legs' | 'upper' | 'lower' | 'full' | 'custom';
 
-export type ThemeName = 'dark' | 'light' | 'black' | 'contrast';
+export type ThemeName = 'dark' | 'light';
 
 export type Language = 'es' | 'en';
 

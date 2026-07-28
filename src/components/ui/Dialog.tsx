@@ -21,9 +21,9 @@ const VARIANT = {
 } as const;
 
 const SURFACE = {
-  center: 'rounded-3xl max-w-md w-full',
-  sheet: 'rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md max-h-[90vh]',
-  fullscreen: 'rounded-none sm:rounded-3xl w-full sm:max-w-2xl h-full sm:h-auto sm:max-h-[90vh]',
+  center: 'rounded-[28px] max-w-md w-full',
+  sheet: 'rounded-t-[28px] sm:rounded-[28px] w-full sm:max-w-md max-h-[90vh] safe-bottom',
+  fullscreen: 'rounded-none sm:rounded-[28px] w-full sm:max-w-2xl h-full sm:h-auto sm:max-h-[90vh]',
 } as const;
 
 export function Dialog({
@@ -77,28 +77,30 @@ export function Dialog({
   }, [open, dismissible, onClose]);
 
   if (!open) return null;
-  const role = variant === 'sheet' ? 'dialog' : 'dialog';
 
   return (
     <div className={cn('fixed inset-0 z-[150] flex', VARIANT[variant])} role="presentation">
       <div
-        className="absolute inset-0 bg-black/55 backdrop-blur-sm animate-fade-in"
+        className="absolute inset-0 bg-black/40 backdrop-blur-md animate-fade"
         onClick={dismissible ? onClose : undefined}
         aria-hidden="true"
       />
       <div
         ref={dialogRef}
-        role={role}
+        role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
         aria-describedby={description ? 'dialog-desc' : undefined}
         className={cn(
-          'relative glass-strong shadow-2xl animate-slide-up overflow-hidden flex flex-col',
+          'relative glass-2 overflow-hidden flex flex-col',
+          'shadow-[var(--shadow-dialog)]',
+          variant === 'center' && 'animate-spring',
+          variant === 'sheet' && 'animate-sheet',
           SURFACE[variant],
         )}
       >
-        <header className="flex items-center justify-between gap-3 border-b border-app p-4">
-          <h2 id="dialog-title" className="text-base font-semibold text-primary">
+        <header className="flex items-center justify-between gap-3 px-5 py-4">
+          <h2 id="dialog-title" className="text-[17px] font-semibold text-primary tracking-tight">
             {title}
           </h2>
           {dismissible && (
@@ -113,12 +115,12 @@ export function Dialog({
           )}
         </header>
         {description && (
-          <p id="dialog-desc" className="px-4 pt-3 text-sm text-secondary">
+          <p id="dialog-desc" className="px-5 pb-1 text-[13px] text-secondary">
             {description}
           </p>
         )}
-        <div className="flex-1 overflow-y-auto p-4">{children}</div>
-        {footer && <footer className="border-t border-app p-4">{footer}</footer>}
+        <div className="flex-1 overflow-y-auto px-5 pb-5">{children}</div>
+        {footer && <footer className="border-t border-app px-5 py-4">{footer}</footer>}
       </div>
     </div>
   );
