@@ -3,7 +3,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "regions": ["mad1"],
+  "regions": ["cdg1"],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" }
   ]
