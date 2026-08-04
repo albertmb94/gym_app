@@ -146,6 +146,50 @@ async function handleAdminListUsers(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+async function handleAdminRestoreData(req: VercelRequest, res: VercelResponse) {
+  if (!requireAdmin(req, res)) return;
+  if (!requireDb(res)) return;
+  try {
+    const body = await readJson(req) as { username?: unknown; data?: unknown };
+    const rawUsername = typeof body?.username === 'string' ? body.username : '';
+    const username = normalizeUsername(rawUsername);
+    if (!isValidUsername(username)) {
+      return send(res, 400, { error: 'Invalid username format' });
+    }
+    if (!body?.data || typeof body.data !== 'object') {
+      return send(res, 400, { error: 'Missing "data" object' });
+    }
+    const dataObj = body.data as Record<string, unknown>;
+    if (!dataObj.users || typeof dataObj.users !== 'object') {
+      return send(res, 400, { error: 'data.users must be an object' });
+    }
+    if (!dataObj.sessions || typeof dataObj.sessions !== 'object') {
+      return send(res, 400, { error: 'data.sessions must be an object' });
+    }
+    if (!dataObj.cardioSessions || typeof dataObj.cardioSessions !== 'object') {
+      return send(res, 400, { error: 'data.cardioSessions must be an object' });
+    }
+    await ensureDb();
+    const row = await findUserRow(username);
+    if (!row) {
+      return send(res, 404, { error: 'User not found. Register the user first, then restore.' });
+    }
+    const json = JSON.stringify(dataObj);
+    const now = Date.now();
+    const newRevision = row.revision + 1;
+    const { getDb } = await import('./db.js');
+    await getDb().execute({
+      sql: 'UPDATE users SET data = ?, revision = ?, updated_at = ? WHERE username = ? AND revision = ?',
+      args: [json, newRevision, now, username, row.revision],
+    });
+    console.log(`[api] admin restored data for "${username}" (${json.length} bytes, revision ${newRevision})`);
+    send(res, 200, { ok: true, username, revision: newRevision, bytes: json.length });
+  } catch (err) {
+    console.error('[api] admin restore error:', err);
+    send(res, 500, { error: 'Failed to restore', message: err instanceof Error ? err.message : String(err) });
+  }
+}
+
 async function handleAdminResetPassword(req: VercelRequest, res: VercelResponse) {
   if (!requireAdmin(req, res)) return;
   if (!requireDb(res)) return;
@@ -365,6 +409,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (method === 'POST' && url === '/api/admin/reset-password') {
     return handleAdminResetPassword(req, res);
+  }
+  if (method === 'POST' && url === '/api/admin/restore-data') {
+    return handleAdminRestoreData(req, res);
   }
   if (method === 'GET' && url === '/api/admin/list-users') {
     return handleAdminListUsers(req, res);
