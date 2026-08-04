@@ -1,5 +1,306 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { z } from 'zod';
+import { getEnv } from './env.js';
+import {
+  hashToken,
+  verifyToken,
+  generateSessionToken,
+  generateRecoveryCode,
+  normalizeUsername,
+  isValidUsername,
+  isValidToken,
+} from './crypto.js';
+import { findUserRow, initDb, insertUserWithToken, rotateToken, updateUserWithCas } from './db.js';
+import { userDataSchema, UserData } from './schemas.js';
 
-export default function handler(req: VercelRequest, res: VercelResponse) {
-  res.status(200).json({ ok: true, url: req.url });
+const env = getEnv();
+
+async function readJson(req: VercelRequest): Promise<unknown> {
+  if (req.body !== undefined) return req.body;
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (c: Buffer) => chunks.push(c));
+    req.on('end', () => {
+      try {
+        const raw = Buffer.concat(chunks).toString('utf8');
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch (e) {
+        reject(e);
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+function send(res: VercelResponse, status: number, body: unknown) {
+  res.status(status).json(body);
+}
+
+function notFound(res: VercelResponse) {
+  send(res, 404, { error: 'Not found' });
+}
+
+function requireDb(res: VercelResponse): boolean {
+  if (!env.dbConfigured) {
+    send(res, 503, {
+      error: 'Database not configured',
+      message: 'Set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in Vercel environment variables, then redeploy.',
+    });
+    return false;
+  }
+  return true;
+}
+
+async function ensureDb() {
+  await initDb();
+}
+
+const registerSchema = z.object({
+  username: z.string().min(2).max(32),
+  token: z.string().min(8).max(128),
+  data: userDataSchema,
+});
+
+const loginSchema = z.object({
+  username: z.string().min(2).max(32),
+  token: z.string().min(8).max(128),
+});
+
+const recoverySchema = z.object({
+  username: z.string().min(2).max(32),
+  recoveryCode: z.string().regex(/^[A-Z0-9-]{14}$/),
+  newToken: z.string().min(8).max(128),
+});
+
+const pushSchema = z.object({
+  data: userDataSchema,
+  expectedRevision: z.number().int().min(0),
+});
+
+function sanitizeUserData(data: UserData): UserData {
+  const allowedKeys = new Set([normalizeUsername(Object.keys(data.users)[0] || '')]);
+  const users: Record<string, typeof data.users[string]> = {};
+  for (const [key, value] of Object.entries(data.users)) {
+    const norm = normalizeUsername(key);
+    if (allowedKeys.has(norm) && value.username.toLowerCase() === norm) {
+      users[norm] = { ...value, username: norm };
+    }
+  }
+  const target = Object.keys(users)[0];
+  const sessions = target && data.sessions[target] ? { [target]: data.sessions[target] } : {};
+  const cardioSessions = target && data.cardioSessions[target] ? { [target]: data.cardioSessions[target] } : {};
+  return { users, sessions, cardioSessions, revision: data.revision };
+}
+
+function safeParse(data: string): unknown {
+  try { return JSON.parse(data); } catch { return null; }
+}
+
+const dataUsernamePattern = /^\/api\/data\/([^/]+)$/;
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function rateLimit(bucket: string, max: number): boolean {
+  const now = Date.now();
+  const b = rateBuckets.get(bucket);
+  if (!b || b.resetAt < now) {
+    rateBuckets.set(bucket, { count: 1, resetAt: now + 60_000 });
+    return true;
+  }
+  if (b.count >= max) return false;
+  b.count++;
+  return true;
+}
+
+async function handleHealth(_req: VercelRequest, res: VercelResponse) {
+  send(res, 200, {
+    ok: env.dbConfigured,
+    hasDb: env.dbConfigured,
+    revision: env.NODE_ENV,
+  });
+}
+
+async function handleRegister(req: VercelRequest, res: VercelResponse) {
+  if (!requireDb(res)) return;
+  if (!rateLimit('auth', env.AUTH_RATE_LIMIT_PER_MIN)) return send(res, 429, { error: 'Too many auth attempts' });
+  try {
+    const body = await readJson(req);
+    const parsed = registerSchema.safeParse(body);
+    if (!parsed.success) return send(res, 400, { error: 'Invalid request', details: parsed.error.issues });
+    const username = normalizeUsername(parsed.data.username);
+    if (!isValidUsername(username)) return send(res, 400, { error: 'Invalid username format' });
+    if (!isValidToken(parsed.data.token)) return send(res, 400, { error: 'Token must be 8-128 characters' });
+    await ensureDb();
+    const existing = await findUserRow(username);
+    if (existing) return send(res, 409, { error: 'Username already taken' });
+    const tokenHash = hashToken(parsed.data.token);
+    const recoveryCode = generateRecoveryCode();
+    const recoveryHash = hashToken(recoveryCode);
+    const now = Date.now();
+    const sanitized = sanitizeUserData(parsed.data.data);
+    await insertUserWithToken(username, tokenHash, JSON.stringify(sanitized), now);
+    await rotateToken(username, tokenHash, recoveryHash);
+    const session = generateSessionToken();
+    send(res, 201, { ok: true, username, session, recoveryCode, revision: 1 });
+  } catch (err) {
+    console.error('[api] register error:', err);
+    send(res, 500, { error: 'Internal server error' });
+  }
+}
+
+async function handleLogin(req: VercelRequest, res: VercelResponse) {
+  if (!requireDb(res)) return;
+  if (!rateLimit('auth', env.AUTH_RATE_LIMIT_PER_MIN)) return send(res, 429, { error: 'Too many auth attempts' });
+  try {
+    const body = await readJson(req);
+    const parsed = loginSchema.safeParse(body);
+    if (!parsed.success) return send(res, 400, { error: 'Invalid request' });
+    const username = normalizeUsername(parsed.data.username);
+    if (!isValidUsername(username)) return send(res, 401, { error: 'Invalid credentials' });
+    await ensureDb();
+    const row = await findUserRow(username);
+    if (!row || !verifyToken(parsed.data.token, row.token_hash)) {
+      return send(res, 401, { error: 'Invalid credentials' });
+    }
+    const session = generateSessionToken();
+    send(res, 200, { ok: true, username, session, revision: row.revision, updatedAt: row.updated_at });
+  } catch (err) {
+    console.error('[api] login error:', err);
+    send(res, 500, { error: 'Internal server error' });
+  }
+}
+
+async function handleRecover(req: VercelRequest, res: VercelResponse) {
+  if (!requireDb(res)) return;
+  if (!rateLimit('auth', env.AUTH_RATE_LIMIT_PER_MIN)) return send(res, 429, { error: 'Too many auth attempts' });
+  try {
+    const body = await readJson(req);
+    const parsed = recoverySchema.safeParse(body);
+    if (!parsed.success) return send(res, 400, { error: 'Invalid request' });
+    const username = normalizeUsername(parsed.data.username);
+    await ensureDb();
+    const row = await findUserRow(username);
+    if (!row || !row.recovery_code_hash || !verifyToken(parsed.data.recoveryCode, row.recovery_code_hash)) {
+      return send(res, 401, { error: 'Invalid recovery code' });
+    }
+    const newTokenHash = hashToken(parsed.data.newToken);
+    await rotateToken(username, newTokenHash, row.recovery_code_hash);
+    const session = generateSessionToken();
+    send(res, 200, { ok: true, username, session });
+  } catch (err) {
+    console.error('[api] recover error:', err);
+    send(res, 500, { error: 'Internal server error' });
+  }
+}
+
+async function authenticate(req: VercelRequest, res: VercelResponse): Promise<string | null> {
+  const authHeader = req.headers.authorization;
+  const auth = typeof authHeader === 'string' ? authHeader : '';
+  const [scheme, token] = auth.split(' ');
+  if (scheme?.toLowerCase() !== 'bearer' || !token) {
+    send(res, 401, { error: 'Authentication required' });
+    return null;
+  }
+  const usernameParam = (req as any)._username;
+  if (typeof usernameParam !== 'string') {
+    send(res, 400, { error: 'Invalid username' });
+    return null;
+  }
+  const username = normalizeUsername(usernameParam);
+  if (!isValidUsername(username)) {
+    send(res, 400, { error: 'Invalid username' });
+    return null;
+  }
+  await ensureDb();
+  const row = await findUserRow(username);
+  if (!row || !verifyToken(token, row.token_hash)) {
+    send(res, 401, { error: 'Invalid credentials' });
+    return null;
+  }
+  (req as any).user = { username, revision: row.revision, updatedAt: row.updated_at };
+  return username;
+}
+
+async function handleGetData(req: VercelRequest, res: VercelResponse) {
+  if (!requireDb(res)) return;
+  if (!rateLimit('sync', env.SYNC_RATE_LIMIT_PER_MIN)) return send(res, 429, { error: 'Too many requests' });
+  const username = await authenticate(req, res);
+  if (!username) return;
+  try {
+    const row = await findUserRow(username);
+    if (!row) return send(res, 404, { error: 'Not found' });
+    let parsed: unknown;
+    try { parsed = JSON.parse(row.data); } catch { return send(res, 500, { error: 'Corrupted data' }); }
+    send(res, 200, { data: parsed, revision: row.revision, updatedAt: row.updated_at });
+  } catch (err) {
+    console.error('[api] getData error:', err);
+    send(res, 500, { error: 'Failed to read' });
+  }
+}
+
+async function handlePutData(req: VercelRequest, res: VercelResponse) {
+  if (!requireDb(res)) return;
+  if (!rateLimit('sync', env.SYNC_RATE_LIMIT_PER_MIN)) return send(res, 429, { error: 'Too many requests' });
+  const username = await authenticate(req, res);
+  if (!username) return;
+  try {
+    const body = await readJson(req);
+    const parsed = pushSchema.safeParse(body);
+    if (!parsed.success) return send(res, 400, { error: 'Invalid data', details: parsed.error.issues });
+    const sanitized = sanitizeUserData(parsed.data.data);
+    const json = JSON.stringify(sanitized);
+    const newRevision = parsed.data.expectedRevision + 1;
+    const now = Date.now();
+    const result = await updateUserWithCas(username, parsed.data.expectedRevision, newRevision, json, null, now);
+    if (!result.ok) {
+      const current = await findUserRow(username);
+      return send(res, 409, {
+        error: 'Conflict',
+        actualRevision: result.actualRevision ?? current?.revision ?? 0,
+        serverData: current ? safeParse(current.data) : null,
+        updatedAt: current?.updated_at ?? 0,
+      });
+    }
+    send(res, 200, { ok: true, revision: newRevision, updatedAt: now });
+  } catch (err) {
+    console.error('[api] putData error:', err);
+    send(res, 500, { error: 'Failed to write' });
+  }
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const url = req.url || '';
+  const method = (req.method || 'GET').toUpperCase();
+
+  res.setHeader('Access-Control-Allow-Origin', env.ALLOWED_ORIGIN || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Max-Age', '600');
+
+  if (method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+
+  if (method === 'GET' && url === '/api' || url === '/api/' || url === '/api/health') {
+    return handleHealth(req, res);
+  }
+
+  if (method === 'POST' && url === '/api/auth/register') {
+    return handleRegister(req, res);
+  }
+  if (method === 'POST' && url === '/api/auth/login') {
+    return handleLogin(req, res);
+  }
+  if (method === 'POST' && url === '/api/auth/recover') {
+    return handleRecover(req, res);
+  }
+
+  const dataMatch = url.match(dataUsernamePattern);
+  if (dataMatch) {
+    (req as any)._username = decodeURIComponent(dataMatch[1]);
+    if (method === 'GET') return handleGetData(req, res);
+    if (method === 'PUT') return handlePutData(req, res);
+  }
+
+  notFound(res);
 }
