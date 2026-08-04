@@ -132,6 +132,20 @@ function requireAdmin(req: VercelRequest, res: VercelResponse): boolean {
   return true;
 }
 
+async function handleAdminListUsers(req: VercelRequest, res: VercelResponse) {
+  if (!requireAdmin(req, res)) return;
+  if (!requireDb(res)) return;
+  try {
+    await ensureDb();
+    const { getDb } = await import('./db.js');
+    const result = await getDb().execute('SELECT username, revision, updated_at, length(data) as data_len, token_hash IS NOT NULL as has_hash FROM users');
+    send(res, 200, { users: result.rows });
+  } catch (err) {
+    console.error('[api] admin list error:', err);
+    send(res, 500, { error: 'Failed to list', message: err instanceof Error ? err.message : String(err) });
+  }
+}
+
 async function handleAdminResetPassword(req: VercelRequest, res: VercelResponse) {
   console.log('[api] admin reset hit', { url: req.url, method: req.method });
   if (!requireAdmin(req, res)) return;
@@ -359,6 +373,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (method === 'POST' && url === '/api/admin/reset-password') {
     return handleAdminResetPassword(req, res);
+  }
+  if (method === 'GET' && url === '/api/admin/list-users') {
+    return handleAdminListUsers(req, res);
   }
 
   const dataMatch = url.match(dataUsernamePattern);
