@@ -147,30 +147,22 @@ async function handleAdminListUsers(req: VercelRequest, res: VercelResponse) {
 }
 
 async function handleAdminResetPassword(req: VercelRequest, res: VercelResponse) {
-  console.log('[api] admin reset hit', { url: req.url, method: req.method });
   if (!requireAdmin(req, res)) return;
   if (!requireDb(res)) return;
   try {
     const body = await readJson(req) as { username?: unknown; newPassword?: unknown };
-    console.log('[api] admin reset body', body);
     const rawUsername = typeof body?.username === 'string' ? body.username : '';
     const newPassword = typeof body?.newPassword === 'string' ? body.newPassword : '';
     const username = normalizeUsername(rawUsername);
-    console.log('[api] admin reset normalized', { username });
     if (!isValidUsername(username)) {
-      console.log('[api] admin reset invalid username');
       return send(res, 400, { error: 'Invalid username format' });
     }
     if (!isValidToken(newPassword)) {
-      console.log('[api] admin reset invalid password');
       return send(res, 400, { error: 'newPassword must be 8-128 characters' });
     }
     await ensureDb();
-    console.log('[api] admin reset db ensured, looking up', username);
     const row = await findUserRow(username);
-    console.log('[api] admin reset lookup result', { found: !!row });
     if (!row) {
-      console.log('[api] admin reset user not found:', username);
       return send(res, 404, { error: 'User not found', username });
     }
     const tokenHash = hashToken(newPassword);
