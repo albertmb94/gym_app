@@ -63,13 +63,23 @@ const syncLimiter = rateLimit({
 
 app.get('/api/health', (_req, res) => {
   res.json({
-    ok: true,
-    hasDb: Boolean(env.TURSO_DATABASE_URL),
+    ok: env.dbConfigured,
+    hasDb: env.dbConfigured,
     revision: env.NODE_ENV,
   });
 });
 
-app.use(async (_req, _res, next) => {
+function requireDb(_req: Request, res: Response, next: NextFunction) {
+  if (!env.dbConfigured) {
+    return res.status(503).json({
+      error: 'Database not configured',
+      message: 'Set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in Vercel environment variables, then redeploy.',
+    });
+  }
+  next();
+}
+
+app.use(requireDb, async (_req, _res, next) => {
   try {
     await initDb();
     next();
