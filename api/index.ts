@@ -61,6 +61,14 @@ const syncLimiter = rateLimit({
   message: { error: 'Too many requests, please slow down' },
 });
 
+app.get('/api/health', (_req, res) => {
+  res.json({
+    ok: true,
+    hasDb: Boolean(env.TURSO_DATABASE_URL),
+    revision: env.NODE_ENV,
+  });
+});
+
 app.use(async (_req, _res, next) => {
   try {
     await initDb();
@@ -68,14 +76,6 @@ app.use(async (_req, _res, next) => {
   } catch (err) {
     next(err);
   }
-});
-
-app.get('/api/health', (_req, res) => {
-  res.json({
-    ok: true,
-    hasDb: Boolean(env.TURSO_DATABASE_URL),
-    revision: env.NODE_ENV,
-  });
 });
 
 const registerSchema = z.object({
