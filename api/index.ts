@@ -1,11 +1,5 @@
-import express from 'express';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const app = express();
-
-app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, source: 'handler-wrap' });
-});
-
-export default function handler(req: any, res: any) {
-  return (app as any)(req, res);
+export default function handler(_req: VercelRequest, res: VercelResponse) {
+  res.status(200).json({ ok: true, source: 'plain-handler' });
 }
