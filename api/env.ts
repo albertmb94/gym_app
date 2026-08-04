@@ -11,6 +11,7 @@ const baseSchema = z.object({
 export type Env = z.infer<typeof baseSchema> & {
   TURSO_DATABASE_URL: string;
   TURSO_AUTH_TOKEN: string;
+  ADMIN_RESET_TOKEN: string;
   dbConfigured: boolean;
 };
 
@@ -25,10 +26,12 @@ export function getEnv(): Env {
   }
   const url = process.env.TURSO_DATABASE_URL?.trim() ?? '';
   const token = process.env.TURSO_AUTH_TOKEN?.trim() ?? '';
+  const adminToken = process.env.ADMIN_RESET_TOKEN?.trim() ?? '';
   cached = {
     ...parsed.data,
     TURSO_DATABASE_URL: url,
     TURSO_AUTH_TOKEN: token,
+    ADMIN_RESET_TOKEN: adminToken,
     dbConfigured: Boolean(url && token),
   };
   return cached;

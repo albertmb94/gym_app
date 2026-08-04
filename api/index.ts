@@ -111,6 +111,61 @@ function rateLimit(bucket: string, max: number): boolean {
   return true;
 }
 
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+function requireAdmin(req: VercelRequest, res: VercelResponse): boolean {
+  if (!env.ADMIN_RESET_TOKEN) {
+    send(res, 503, { error: 'Admin endpoint disabled: set ADMIN_RESET_TOKEN in Vercel environment variables' });
+    return false;
+  }
+  const header = req.headers['x-admin-token'];
+  const token = typeof header === 'string' ? header : '';
+  if (!token || !timingSafeEqual(token, env.ADMIN_RESET_TOKEN)) {
+    send(res, 401, { error: 'Invalid admin token' });
+    return false;
+  }
+  return true;
+}
+
+async function handleAdminResetPassword(req: VercelRequest, res: VercelResponse) {
+  if (!requireAdmin(req, res)) return;
+  if (!requireDb(res)) return;
+  try {
+    const body = await readJson(req) as { username?: unknown; newPassword?: unknown };
+    const rawUsername = typeof body?.username === 'string' ? body.username : '';
+    const newPassword = typeof body?.newPassword === 'string' ? body.newPassword : '';
+    const username = normalizeUsername(rawUsername);
+    if (!isValidUsername(username)) {
+      return send(res, 400, { error: 'Invalid username format' });
+    }
+    if (!isValidToken(newPassword)) {
+      return send(res, 400, { error: 'newPassword must be 8-128 characters' });
+    }
+    await ensureDb();
+    const row = await findUserRow(username);
+    if (!row) {
+      return send(res, 404, { error: 'User not found' });
+    }
+    const tokenHash = hashToken(newPassword);
+    const now = Date.now();
+    const { getDb } = await import('./db.js');
+    await getDb().execute({
+      sql: 'UPDATE users SET token_hash = ?, updated_at = ? WHERE username = ?',
+      args: [tokenHash, now, username],
+    });
+    console.log(`[api] admin reset password for "${username}"`);
+    send(res, 200, { ok: true, username, resetAt: now });
+  } catch (err) {
+    console.error('[api] admin reset error:', err);
+    send(res, 500, { error: 'Failed to reset password' });
+  }
+}
+
 async function handleHealth(_req: VercelRequest, res: VercelResponse) {
   send(res, 200, {
     ok: env.dbConfigured,
@@ -293,6 +348,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (method === 'POST' && url === '/api/auth/recover') {
     return handleRecover(req, res);
+  }
+  if (method === 'POST' && url === '/api/admin/reset-password') {
+    return handleAdminResetPassword(req, res);
   }
 
   const dataMatch = url.match(dataUsernamePattern);
