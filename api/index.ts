@@ -418,7 +418,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const url = req.url || '';
   const method = (req.method || 'GET').toUpperCase();
 
-  res.setHeader('Access-Control-Allow-Origin', env.ALLOWED_ORIGIN || '*');
+  const origin = req.headers.origin;
+  const allowedOrigin = env.ALLOWED_ORIGIN;
+  // Si hay ALLOWED_ORIGIN configurado, usarlo. Si no, hacer echo del Origin para soportar credenciales.
+  const corsOrigin = allowedOrigin || origin || '*';
+  res.setHeader('Access-Control-Allow-Origin', corsOrigin);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Max-Age', '600');
