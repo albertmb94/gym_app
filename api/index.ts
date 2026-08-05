@@ -424,6 +424,7 @@ async function handlePutData(req: VercelRequest, res: VercelResponse) {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const url = req.url || '';
   const method = (req.method || 'GET').toUpperCase();
+  console.log('[api] req', method, url, 'origin=', req.headers.origin);
 
   const origin = req.headers.origin;
   const allowedOrigin = env.ALLOWED_ORIGIN;
