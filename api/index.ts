@@ -203,12 +203,35 @@ async function handleAdminRestoreData(req: VercelRequest, res: VercelResponse) {
     if (!dataObj.cardioSessions || typeof dataObj.cardioSessions !== 'object') {
       return send(res, 400, { error: 'data.cardioSessions must be an object' });
     }
+    // Normalizar keys a minúsculas para que coincidan con el username del DB
+    const normalizedData: Record<string, unknown> = { revision: (dataObj as any).revision ?? 1 };
+    const normalizedUsers: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(dataObj.users as Record<string, any>)) {
+      const norm = normalizeUsername(key);
+      if (norm === username && value && typeof value === 'object') {
+        normalizedUsers[username] = { ...value, username };
+      }
+    }
+    normalizedData.users = normalizedUsers;
+    const normalizedSessions: Record<string, unknown> = {};
+    const normalizedCardio: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(dataObj.sessions as Record<string, any>)) {
+      const norm = normalizeUsername(key);
+      if (norm === username) normalizedSessions[username] = value;
+    }
+    for (const [key, value] of Object.entries(dataObj.cardioSessions as Record<string, any>)) {
+      const norm = normalizeUsername(key);
+      if (norm === username) normalizedCardio[username] = value;
+    }
+    normalizedData.sessions = normalizedSessions;
+    normalizedData.cardioSessions = normalizedCardio;
+
     await ensureDb();
     const row = await findUserRow(username);
     if (!row) {
       return send(res, 404, { error: 'User not found. Register the user first, then restore.' });
     }
-    const json = JSON.stringify(dataObj);
+    const json = JSON.stringify(normalizedData);
     const now = Date.now();
     const newRevision = row.revision + 1;
     const { getDb } = await import('./db.js');
