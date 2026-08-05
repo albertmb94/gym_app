@@ -340,10 +340,11 @@ async function handleRecover(req: VercelRequest, res: VercelResponse) {
 }
 
 async function authenticate(req: VercelRequest, res: VercelResponse): Promise<string | null> {
-  const authHeader = req.headers.authorization;
-  const auth = typeof authHeader === 'string' ? authHeader : '';
+  const rawAuth = req.headers.authorization;
+  const auth = Array.isArray(rawAuth) ? rawAuth[0] : (typeof rawAuth === 'string' ? rawAuth : '');
   const [scheme, token] = auth.split(' ');
-  if (scheme?.toLowerCase() !== 'bearer' || !token) {
+  if (!scheme || scheme.toLowerCase() !== 'bearer' || !token) {
+    console.log('[api] auth fail: header=', JSON.stringify(auth).slice(0, 50));
     send(res, 401, { error: 'Authentication required' });
     return null;
   }
@@ -359,7 +360,13 @@ async function authenticate(req: VercelRequest, res: VercelResponse): Promise<st
   }
   await ensureDb();
   const row = await findUserRow(username);
-  if (!row || !verifyToken(token, row.token_hash)) {
+  if (!row) {
+    console.log('[api] auth fail: user not found', username);
+    send(res, 401, { error: 'Invalid credentials' });
+    return null;
+  }
+  if (!verifyToken(token, row.token_hash)) {
+    console.log('[api] auth fail: bad token for', username);
     send(res, 401, { error: 'Invalid credentials' });
     return null;
   }
