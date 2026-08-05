@@ -10,6 +10,7 @@ import {
   isValidUsername,
   isValidToken,
 } from './crypto.js';
+import { verifySessionToken } from './session.js';
 import { findUserRow, initDb, insertUserWithToken, rotateToken, updateUserWithCas } from './db.js';
 import { userDataSchema, UserData } from './schemas.js';
 
@@ -365,7 +366,10 @@ async function authenticate(req: VercelRequest, res: VercelResponse): Promise<st
     send(res, 401, { error: 'Invalid credentials' });
     return null;
   }
-  if (!verifyToken(token, row.token_hash)) {
+  // El token puede ser la contraseña (formato legacy) o una sesión firmada
+  const isSession = verifySessionToken(username, token);
+  const isPassword = !isSession && verifyToken(token, row.token_hash);
+  if (!isSession && !isPassword) {
     console.log('[api] auth fail: bad token for', username);
     send(res, 401, { error: 'Invalid credentials' });
     return null;
