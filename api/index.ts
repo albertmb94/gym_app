@@ -132,6 +132,39 @@ function requireAdmin(req: VercelRequest, res: VercelResponse): boolean {
   return true;
 }
 
+async function handleAdminGetData(req: VercelRequest, res: VercelResponse) {
+  if (!requireAdmin(req, res)) return;
+  if (!requireDb(res)) return;
+  try {
+    await ensureDb();
+    const rawUsername = typeof req.query.username === 'string' ? req.query.username : '';
+    const username = normalizeUsername(rawUsername);
+    if (!isValidUsername(username)) {
+      return send(res, 400, { error: 'Invalid username' });
+    }
+    const { getDb } = await import('./db.js');
+    const result = await getDb().execute({
+      sql: 'SELECT data, revision, updated_at FROM users WHERE username = ?',
+      args: [username],
+    });
+    const row = result.rows[0];
+    if (!row) return send(res, 404, { error: 'User not found' });
+    const dataStr = String(row.data ?? '');
+    let parsed: unknown = null;
+    try { parsed = JSON.parse(dataStr); } catch { /* ignore */ }
+    send(res, 200, {
+      username,
+      revision: Number(row.revision ?? 0),
+      updated_at: Number(row.updated_at ?? 0),
+      data_bytes: dataStr.length,
+      data: parsed,
+    });
+  } catch (err) {
+    console.error('[api] admin get-data error:', err);
+    send(res, 500, { error: 'Failed to read', message: err instanceof Error ? err.message : String(err) });
+  }
+}
+
 async function handleAdminListUsers(req: VercelRequest, res: VercelResponse) {
   if (!requireAdmin(req, res)) return;
   if (!requireDb(res)) return;
@@ -415,6 +448,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (method === 'GET' && url === '/api/admin/list-users') {
     return handleAdminListUsers(req, res);
+  }
+  if (method === 'GET' && url === '/api/admin/get-data') {
+    return handleAdminGetData(req, res);
   }
 
   const dataMatch = url.match(dataUsernamePattern);
