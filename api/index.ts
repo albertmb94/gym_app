@@ -4,13 +4,12 @@ import { getEnv } from './env.js';
 import {
   hashToken,
   verifyToken,
-  generateSessionToken,
   generateRecoveryCode,
   normalizeUsername,
   isValidUsername,
   isValidToken,
 } from './crypto.js';
-import { verifySessionToken } from './session.js';
+import { generateSessionToken, verifySessionToken } from './session.js';
 import { findUserRow, initDb, insertUserWithToken, rotateToken, updateUserWithCas } from './db.js';
 import { userDataSchema, UserData } from './schemas.js';
 
