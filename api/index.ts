@@ -344,7 +344,6 @@ async function authenticate(req: VercelRequest, res: VercelResponse): Promise<st
   const auth = Array.isArray(rawAuth) ? rawAuth[0] : (typeof rawAuth === 'string' ? rawAuth : '');
   const [scheme, token] = auth.split(' ');
   if (!scheme || scheme.toLowerCase() !== 'bearer' || !token) {
-    console.log('[api] auth fail: header=', JSON.stringify(auth).slice(0, 50));
     send(res, 401, { error: 'Authentication required' });
     return null;
   }
@@ -361,7 +360,6 @@ async function authenticate(req: VercelRequest, res: VercelResponse): Promise<st
   await ensureDb();
   const row = await findUserRow(username);
   if (!row) {
-    console.log('[api] auth fail: user not found', username);
     send(res, 401, { error: 'Invalid credentials' });
     return null;
   }
@@ -369,7 +367,6 @@ async function authenticate(req: VercelRequest, res: VercelResponse): Promise<st
   const isSession = verifySessionToken(username, token);
   const isPassword = !isSession && verifyToken(token, row.token_hash);
   if (!isSession && !isPassword) {
-    console.log('[api] auth fail: bad token for', username);
     send(res, 401, { error: 'Invalid credentials' });
     return null;
   }
@@ -427,7 +424,6 @@ async function handlePutData(req: VercelRequest, res: VercelResponse) {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const url = req.url || '';
   const method = (req.method || 'GET').toUpperCase();
-  console.log('[api] req', method, url, 'origin=', req.headers.origin);
 
   const origin = req.headers.origin;
   const allowedOrigin = env.ALLOWED_ORIGIN;
