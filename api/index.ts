@@ -137,7 +137,8 @@ async function handleAdminGetData(req: VercelRequest, res: VercelResponse) {
   if (!requireDb(res)) return;
   try {
     await ensureDb();
-    const rawUsername = typeof req.query.username === 'string' ? req.query.username : '';
+    const body = await readJson(req) as { username?: unknown };
+    const rawUsername = typeof body?.username === 'string' ? body.username : '';
     const username = normalizeUsername(rawUsername);
     if (!isValidUsername(username)) {
       return send(res, 400, { error: 'Invalid username' });
@@ -449,7 +450,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (method === 'GET' && url === '/api/admin/list-users') {
     return handleAdminListUsers(req, res);
   }
-  if (method === 'GET' && url === '/api/admin/get-data') {
+  if (method === 'POST' && url === '/api/admin/get-data') {
     return handleAdminGetData(req, res);
   }
 
