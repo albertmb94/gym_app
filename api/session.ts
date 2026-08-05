@@ -20,6 +20,8 @@ function _b64urlDecode(s: string): Buffer {
   return Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/') + pad, 'base64');
 }
 
+void _b64urlDecode;
+
 export function generateSessionToken(username: string): string {
   const sessionId = b64url(crypto.randomBytes(16));
   const expiry = Date.now() + SESSION_TTL_MS;
