@@ -286,7 +286,7 @@ async function handleRegister(req: VercelRequest, res: VercelResponse) {
     const sanitized = sanitizeUserData(parsed.data.data);
     await insertUserWithToken(username, tokenHash, JSON.stringify(sanitized), now);
     await rotateToken(username, tokenHash, recoveryHash);
-    const session = generateSessionToken();
+    const session = generateSessionToken(username);
     send(res, 201, { ok: true, username, session, recoveryCode, revision: 1 });
   } catch (err) {
     console.error('[api] register error:', err);
@@ -308,7 +308,7 @@ async function handleLogin(req: VercelRequest, res: VercelResponse) {
     if (!row || !verifyToken(parsed.data.token, row.token_hash)) {
       return send(res, 401, { error: 'Invalid credentials' });
     }
-    const session = generateSessionToken();
+    const session = generateSessionToken(username);
     send(res, 200, { ok: true, username, session, revision: row.revision, updatedAt: row.updated_at });
   } catch (err) {
     console.error('[api] login error:', err);
@@ -331,7 +331,7 @@ async function handleRecover(req: VercelRequest, res: VercelResponse) {
     }
     const newTokenHash = hashToken(parsed.data.newToken);
     await rotateToken(username, newTokenHash, row.recovery_code_hash);
-    const session = generateSessionToken();
+    const session = generateSessionToken(username);
     send(res, 200, { ok: true, username, session });
   } catch (err) {
     console.error('[api] recover error:', err);
