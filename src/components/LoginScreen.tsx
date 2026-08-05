@@ -27,6 +27,7 @@ export default function LoginScreen({ onLogin, onRegister, knownUsers, onRemoveU
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,11 +90,17 @@ export default function LoginScreen({ onLogin, onRegister, knownUsers, onRemoveU
             <Button
               variant="secondary"
               fullWidth
-              onClick={() => {
-                navigator.clipboard?.writeText(recoveryCode);
+              onClick={async () => {
+                try {
+                  await navigator.clipboard?.writeText(recoveryCode);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                } catch {
+                  /* clipboard no disponible */
+                }
               }}
             >
-              {t.profile.copy}
+              {copied ? t.profile.copied : t.profile.copy}
             </Button>
             <Button variant="primary" fullWidth onClick={() => setRecoveryCode(null)}>
               {t.general.continue}

@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { IconButton } from './IconButton';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export interface SheetProps {
   open: boolean;
@@ -25,6 +26,7 @@ export function Sheet({
   dismissible = true,
   maxHeight = '90vh',
 }: SheetProps) {
+  const { t } = useLanguage();
   const sheetRef = useRef<HTMLDivElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
 
@@ -85,7 +87,7 @@ export function Sheet({
             </h2>
             {dismissible && (
               <IconButton
-                label="Cerrar"
+                label={t.general.close}
                 icon={<X className="h-4 w-4" aria-hidden="true" />}
                 onClick={onClose}
                 variant="ghost"

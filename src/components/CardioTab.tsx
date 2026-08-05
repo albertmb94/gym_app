@@ -157,7 +157,7 @@ export default function CardioTab({
             {t.stats.thisWeek}
           </div>
           <div className="text-[22px] font-semibold text-primary tabular-nums tracking-tight">{weeklyMinutes} min</div>
-          <div className="text-[11px] text-muted">{weekSessions.length} {t.cardio.heartRateZones && weekSessions.length === 1 ? 'sesión' : 'sesiones'}</div>
+          <div className="text-[11px] text-muted">{weekSessions.length} {weekSessions.length === 1 ? t.cardio.session : t.cardio.sessions}</div>
         </div>
         <div className="glass-1 p-4">
           <div className="mb-1 flex items-center gap-2 text-[13px] text-secondary">
@@ -165,7 +165,7 @@ export default function CardioTab({
             {t.cardio.calories}
           </div>
           <div className="text-[22px] font-semibold text-accent tabular-nums tracking-tight">{weeklyCalories.toLocaleString()}</div>
-          <div className="text-[11px] text-muted">kcal {t.stats.thisWeek.toLowerCase()}</div>
+          <div className="text-[11px] text-muted">kcal {t.cardio.thisWeekLower}</div>
         </div>
       </div>
 
@@ -187,7 +187,7 @@ export default function CardioTab({
         }
       >
         <div className="space-y-4">
-          <Field label={language === 'es' ? 'Fecha' : 'Date'}>
+          <Field label={t.cardio.date}>
             {(id) => (
               <input
                 id={id}
@@ -201,7 +201,7 @@ export default function CardioTab({
 
           <div>
             <label className="mb-2 block text-[13px] font-medium text-secondary">
-              {language === 'es' ? 'Tipo de cardio' : 'Cardio type'}
+              {t.cardio.type}
             </label>
             <div className="grid grid-cols-3 gap-2">
               {CARDIO_TYPES.map((cardio) => (
@@ -241,7 +241,7 @@ export default function CardioTab({
                     className="flex w-full items-center justify-center gap-2 rounded-[14px] border-2 border-dashed border-app py-3 text-[13px] text-secondary hover:border-accent hover:text-accent hover:bg-accent-soft/40 transition-colors"
                   >
                     <Upload size={18} aria-hidden="true" />
-                    {language === 'es' ? 'Cargar archivo .gpx' : 'Upload .gpx file'}
+                    {t.cardio.uploadGpxCta}
                   </button>
                   <input
                     ref={fileInputRef}
@@ -251,7 +251,7 @@ export default function CardioTab({
                     className="hidden"
                   />
                   <p className="mt-1 text-[11px] text-muted">
-                    {language === 'es' ? 'Sube una ruta de Strava, Garmin, Komoot, etc.' : 'Upload a route from Strava, Garmin, Komoot, etc.'}
+                    {t.cardio.uploadGpxHint}
                   </p>
                 </>
               ) : (
@@ -259,7 +259,7 @@ export default function CardioTab({
                   <div className="flex items-center justify-between rounded-[14px] bg-surface-2 p-3 border border-app">
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[14px] font-medium text-primary">
-                        {gpxRoute.name || (language === 'es' ? 'Ruta sin nombre' : 'Unnamed route')}
+                        {gpxRoute.name || t.cardio.unnamedRoute}
                       </div>
                       <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-muted">
                         <span className="flex items-center gap-1">
@@ -274,7 +274,7 @@ export default function CardioTab({
                       </div>
                     </div>
                     <IconButton
-                      label={language === 'es' ? 'Quitar ruta' : 'Remove route'}
+                      label={t.cardio.unloadRoute}
                       icon={<X size={16} aria-hidden="true" />}
                       variant="ghost"
                       size="sm"
@@ -361,7 +361,7 @@ export default function CardioTab({
                 id={id}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder={language === 'es' ? '¿Cómo te sentiste?' : 'How did you feel?'}
+                placeholder={t.cardio.notesPlaceholder}
                 rows={3}
                 className="block w-full rounded-[12px] border border-app bg-surface-2 px-3.5 py-2.5 text-[14px] text-primary placeholder:text-muted focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent resize-none"
               />
@@ -372,7 +372,7 @@ export default function CardioTab({
 
       {/* Sessions list */}
       <div className="space-y-3">
-        <h2 className="text-[14px] font-semibold text-secondary">{language === 'es' ? 'Historial' : 'History'}</h2>
+        <h2 className="text-[14px] font-semibold text-secondary">{t.cardio.history}</h2>
         {sortedSessions.length === 0 ? (
           <EmptyState
             icon={<Activity className="h-6 w-6" />}
@@ -441,7 +441,7 @@ export default function CardioTab({
                     className="mt-3 flex w-full items-center justify-center gap-2 rounded-[12px] bg-surface-2 hover:bg-surface-3 py-2 text-[13px] font-medium text-primary transition-colors"
                   >
                     <MapIcon size={14} aria-hidden="true" />
-                    {isExpanded ? (language === 'es' ? 'Ocultar mapa' : 'Hide map') : (language === 'es' ? 'Ver ruta en mapa' : 'View map')}
+                    {isExpanded ? t.cardio.hideMap : t.cardio.viewMap}
                     {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </button>
                 )}

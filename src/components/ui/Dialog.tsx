@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { IconButton } from './IconButton';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export interface DialogProps {
   open: boolean;
@@ -36,6 +37,7 @@ export function Dialog({
   variant = 'center',
   dismissible = true,
 }: DialogProps) {
+  const { t } = useLanguage();
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
 
@@ -105,8 +107,8 @@ export function Dialog({
           </h2>
           {dismissible && (
             <IconButton
-              aria-label="Cerrar"
-              label="Cerrar"
+              aria-label={t.general.close}
+              label={t.general.close}
               icon={<X className="h-4 w-4" aria-hidden="true" />}
               onClick={onClose}
               variant="ghost"

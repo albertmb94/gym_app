@@ -73,7 +73,9 @@
 
     /* Layout */
     --header-h: 56px;
-    --bottom-nav-h: 64px;
+    /* Altura real del bottom nav incluye safe-area + items. */
+    --bottom-nav-h: calc(64px + env(safe-area-inset-bottom, 0px));
+    --bottom-nav-h-safe: calc(var(--bottom-nav-h) + 12px);
   }
 
   html.theme-light {

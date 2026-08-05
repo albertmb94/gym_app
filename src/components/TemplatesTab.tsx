@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { WorkoutTemplate, TemplateExercise, WeeklyPlan, WorkoutType, Exercise } from '../types';
 import { MUSCLE_LABELS, WORKOUT_TYPE_LABELS, WORKOUT_TYPE_COLORS, DAYS_OF_WEEK, DEFAULT_TEMPLATES } from '../data/exercises';
 import { generateId } from '../lib/id';
+import { useLanguage } from '../contexts/LanguageContext';
 import { Plus, Trash2, Edit3, Save, X, ChevronDown, ChevronUp, Calendar, Dumbbell, RefreshCw, Search } from 'lucide-react';
 import NumericInput from './NumericInput';
+import { Select } from './ui/Select';
 
 interface Props {
   templates: WorkoutTemplate[];
@@ -28,6 +30,7 @@ export default function TemplatesTab({
   getSuggestedSets,
   allExercises,
 }: Props) {
+  const { t } = useLanguage();
   const [activeSection, setActiveSection] = useState<'plan' | 'templates'>('plan');
   const [editingTemplate, setEditingTemplate] = useState<WorkoutTemplate | null>(null);
   const [expandedTemplate, setExpandedTemplate] = useState<string | null>(null);
@@ -43,9 +46,10 @@ export default function TemplatesTab({
   const [exerciseSearch, setExerciseSearch] = useState(''); // NEW: search state
 
   const allTemplates = [...DEFAULT_TEMPLATES, ...templates.filter(t => !DEFAULT_TEMPLATES.some(d => d.id === t.id))];
-  const customTemplates = userCustomTemplates.length > 0
-    ? userCustomTemplates.filter(t => !DEFAULT_TEMPLATES.some(d => d.id === t.id))
-    : templates.filter(t => !DEFAULT_TEMPLATES.some(d => d.id === t.id));
+  // BUG 16: simplificamos la fuente. Plantillas custom = plantillas que NO están en DEFAULT_TEMPLATES.
+  // userCustomTemplates es redundante cuando 'templates' ya contiene solo las del usuario.
+  const customTemplates = (userCustomTemplates.length > 0 ? userCustomTemplates : templates)
+    .filter(t => !DEFAULT_TEMPLATES.some(d => d.id === t.id));
 
   // Helper to find exercise by ID from allExercises
   const getExerciseById = (id: string): Exercise | undefined => {
@@ -170,13 +174,13 @@ export default function TemplatesTab({
           onClick={() => setActiveSection('plan')}
           className={`flex-1 py-3 text-[13px] font-medium flex items-center justify-center gap-2 transition-colors border-b-2 ${activeSection === 'plan' ? 'border-accent text-accent' : 'border-transparent text-secondary hover:text-primary'}`}
         >
-          <Calendar className="w-4 h-4" /> Plan Semanal
+          <Calendar className="w-4 h-4" /> {t.templates.tabPlan}
         </button>
         <button
           onClick={() => setActiveSection('templates')}
           className={`flex-1 py-3 text-[13px] font-medium flex items-center justify-center gap-2 transition-colors border-b-2 ${activeSection === 'templates' ? 'border-accent text-accent' : 'border-transparent text-secondary hover:text-primary'}`}
         >
-          <Dumbbell className="w-4 h-4" /> Plantillas
+          <Dumbbell className="w-4 h-4" /> {t.templates.tabTemplates}
         </button>
       </div>
 
@@ -184,8 +188,8 @@ export default function TemplatesTab({
         {activeSection === 'plan' && (
           <div className="p-4 pb-24 space-y-5">
             <div>
-              <h3 className="text-[15px] font-semibold text-primary tracking-tight mb-1">¿Cuántos días entrenas por semana?</h3>
-              <p className="text-[12px] text-muted mb-3">Configura tu semana y asigna un tipo de entrenamiento a cada día.</p>
+              <h3 className="text-[15px] font-semibold text-primary tracking-tight mb-1">{t.templates.daysPerWeekQuestion}</h3>
+              <p className="text-[12px] text-muted mb-3">{t.templates.daysPerWeekHelp}</p>
               <div className="flex gap-2 flex-wrap">
                 {[1, 2, 3, 4, 5, 6, 7].map(n => (
                   <button
@@ -225,19 +229,16 @@ export default function TemplatesTab({
                         </span>
                       )}
                     </div>
-                    <select
+                    <Select
                       value={day.templateId || ''}
                       onChange={e => handleDayTemplate(i, e.target.value || null)}
-                      className="w-full bg-surface-2 border border-app rounded-[10px] px-3 py-2 text-[13px] text-primary focus-visible:outline-none focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent"
-                    >
-                      <option value="">— Sin entrenamiento (descanso) —</option>
-                      {allTemplates.map(t => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                      ))}
-                    </select>
+                      options={allTemplates.map(tmpl => ({ value: tmpl.id, label: tmpl.name }))}
+                      showEmptyOption
+                      emptyLabel={t.templates.restDayLabel}
+                    />
                     {template && (
                       <div className="mt-2 text-[11px] text-muted">
-                        {template.exercises.length} ejercicios · {template.totalSets} series totales
+                        {template.exercises.length} {t.templates.exercisesCount} · {template.totalSets} {t.templates.totalSets}
                       </div>
                     )}
                   </div>
@@ -250,7 +251,7 @@ export default function TemplatesTab({
                 onClick={handleSavePlan}
                 className="w-full py-3 rounded-[14px] font-semibold transition-all flex items-center justify-center gap-2 bg-accent text-on-accent hover:opacity-90 active:scale-[0.98]"
               >
-                <Save className="w-4 h-4" /> Guardar plan
+                <Save className="w-4 h-4" /> {t.templates.savePlan}
               </button>
             )}
           </div>
@@ -262,10 +263,10 @@ export default function TemplatesTab({
               onClick={openCreate}
               className="w-full py-3 border-2 border-dashed border-app text-secondary rounded-[14px] text-[13px] hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-2"
             >
-              <Plus className="w-5 h-5" /> Nueva plantilla
+              <Plus className="w-5 h-5" /> {t.templates.createNew}
             </button>
 
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">Predefinidas</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">{t.templates.predefinidas}</p>
             {DEFAULT_TEMPLATES.map(t => (
               <TemplateCard
                 key={t.id}
@@ -281,7 +282,7 @@ export default function TemplatesTab({
 
             {customTemplates.length > 0 && (
               <>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted pt-2">Personalizadas</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted pt-2">{t.templates.personalizadas}</p>
                 {customTemplates.map(t => (
                   <TemplateCard
                     key={t.id}
@@ -308,31 +309,31 @@ export default function TemplatesTab({
               <X className="w-5 h-5" />
             </button>
             <h2 className="text-primary font-semibold flex-1 tracking-tight">
-              {customTemplates.some(t => t.id === editingTemplate.id) ? 'Editar' : 'Nueva'} plantilla
+              {customTemplates.some(t => t.id === editingTemplate.id) ? t.templates.editTitle : t.templates.newTitle}
             </h2>
             <button
               onClick={handleSaveTemplate}
               disabled={!editName.trim()}
               className="px-4 py-1.5 bg-accent text-on-accent rounded-[10px] text-[13px] font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Guardar
+              {t.templates.save}
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <div>
-              <label className="text-[13px] text-secondary mb-1 block">Nombre</label>
+              <label className="text-[13px] text-secondary mb-1 block">{t.templates.templateName}</label>
               <input
                 type="text"
                 value={editName}
                 onChange={e => setEditName(e.target.value)}
-                placeholder="Ej: Push Day A"
+                placeholder={t.templates.namePlaceholder}
                 className="w-full bg-surface-2 border border-app rounded-[12px] px-3 py-2.5 text-primary placeholder:text-muted focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               />
             </div>
 
             <div>
-              <label className="text-[13px] text-secondary mb-1 block">Tipo</label>
+              <label className="text-[13px] text-secondary mb-1 block">{t.templates.templateType}</label>
               <div className="flex flex-wrap gap-2">
                 {WORKOUT_TYPES.map(type => (
                   <button
@@ -348,7 +349,7 @@ export default function TemplatesTab({
             </div>
 
             <div>
-              <label className="text-[13px] text-secondary mb-1 block">Series objetivo total</label>
+              <label className="text-[13px] text-secondary mb-1 block">{t.templates.targetSets}</label>
               <NumericInput
                 value={targetSets}
                 onChange={(v) => setTargetSets(v)}
@@ -364,7 +365,7 @@ export default function TemplatesTab({
                 onClick={applySmartSuggestions}
                 className="flex items-center gap-2 text-[13px] text-accent hover:opacity-80"
               >
-                <RefreshCw className="w-4 h-4" /> Aplicar sugerencias inteligentes de carga
+                <RefreshCw className="w-4 h-4" /> {t.templates.applySuggestions}
               </button>
             )}
 
@@ -389,8 +390,8 @@ export default function TemplatesTab({
                     <div className="border-t border-app p-3 space-y-2">
                       <div className="grid grid-cols-12 gap-2 text-[10px] text-muted px-1 font-semibold uppercase tracking-wider">
                         <div className="col-span-1">#</div>
-                        <div className="col-span-5 text-center">Peso (kg)</div>
-                        <div className="col-span-4 text-center">Reps</div>
+                        <div className="col-span-5 text-center">{t.templates.kgColumn}</div>
+                        <div className="col-span-4 text-center">{t.templates.repsColumn}</div>
                         <div className="col-span-2"></div>
                       </div>
                       {ex.sets.map((set, setIdx) => (
@@ -427,7 +428,7 @@ export default function TemplatesTab({
                         onClick={() => addSetToTemplateExercise(exIdx)}
                         className="w-full py-1.5 border border-dashed border-app text-muted rounded-[10px] text-[12px] hover:border-accent hover:text-accent flex items-center justify-center gap-1"
                       >
-                        <Plus className="w-3.5 h-3.5" /> Serie
+                        <Plus className="w-3.5 h-3.5" /> {t.templates.sets}
                       </button>
                     </div>
                   </div>
@@ -439,7 +440,7 @@ export default function TemplatesTab({
               onClick={() => setShowExercisePicker(true)}
               className="w-full py-3 border-2 border-dashed border-app text-secondary rounded-[14px] text-[13px] hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-2"
             >
-              <Plus className="w-5 h-5" /> Añadir ejercicio
+              <Plus className="w-5 h-5" /> {t.templates.addExercise}
             </button>
           </div>
 
@@ -451,7 +452,7 @@ export default function TemplatesTab({
                   <button onClick={() => { setShowExercisePicker(false); setExerciseSearch(''); }} className="text-secondary hover:text-primary">
                     <X className="w-5 h-5" />
                   </button>
-                  <h3 className="text-white font-medium">Seleccionar ejercicio</h3>
+                  <h3 className="text-white font-medium">{t.templates.selectExercise}</h3>
                 </div>
                 {/* Search input */}
                 <div className="relative">
@@ -460,9 +461,8 @@ export default function TemplatesTab({
                     type="text"
                     value={exerciseSearch}
                     onChange={e => setExerciseSearch(e.target.value)}
-                    placeholder="Buscar por nombre o músculo..."
+                    placeholder={t.templates.searchPlaceholder}
                     className="w-full bg-surface-2 border border-app rounded-[10px] pl-10 pr-4 py-2.5 text-[14px] text-primary placeholder:text-muted focus-visible:outline-none focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent"
-                    autoFocus
                   />
                   {exerciseSearch && (
                     <button
@@ -477,7 +477,7 @@ export default function TemplatesTab({
               <div className="flex-1 overflow-y-auto p-3 space-y-2">
                 {filteredExercises.length === 0 ? (
                   <div className="py-8 text-center text-[13px] text-muted">
-                    No se encontraron ejercicios
+                    {t.templates.noExercisesFound}
                   </div>
                 ) : (
                   filteredExercises.map(ex => {
@@ -497,7 +497,7 @@ export default function TemplatesTab({
                             {ex.name}
                             {ex.isCustom && (
                               <span className="text-xs px-1.5 py-0.5 bg-purple-600/30 text-purple-400 rounded">
-                                Personalizado
+                                {t.templates.customBadge}
                               </span>
                             )}
                           </div>
@@ -505,7 +505,7 @@ export default function TemplatesTab({
                           <div className="text-[11px] text-muted">{ex.secondaryMuscles.map(m => MUSCLE_LABELS[m]).join(' · ')}</div>
                         </div>
                         {already && (
-                          <span className="text-[11px] text-muted">Añadido</span>
+                          <span className="text-[11px] text-muted">{t.templates.addedBadge}</span>
                         )}
                       </button>
                     );
@@ -530,6 +530,7 @@ function TemplateCard({ template, isExpanded, onToggle, onEdit, onDelete, isDefa
   isDefault: boolean;
   allExercises: Exercise[];
 }) {
+  const { t } = useLanguage();
   const typeColor = WORKOUT_TYPE_COLORS[template.type] || '#6b7280';
   const totalSets = template.exercises.reduce((sum, e) => sum + e.sets.length, 0);
 
@@ -548,10 +549,10 @@ function TemplateCard({ template, isExpanded, onToggle, onEdit, onDelete, isDefa
           <div className="flex items-center gap-2">
             <span className="text-white font-semibold text-sm">{template.name}</span>
             {isDefault && (
-              <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-secondary">predefinida</span>
+              <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-secondary">{t.templates.predefined}</span>
             )}
           </div>
-          <div className="text-[11px] text-muted">{template.exercises.length} ejercicios · {totalSets} series</div>
+          <div className="text-[11px] text-muted">{template.exercises.length} {t.templates.exercisesCount} · {totalSets} {t.templates.totalSets}</div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <button

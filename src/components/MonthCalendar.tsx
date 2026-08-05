@@ -104,7 +104,7 @@ export default function MonthCalendar({ sessions, cardioSessions }: Props) {
             <div
               key={i}
               className={cn(
-                'relative flex aspect-square flex-col items-center justify-center rounded-[10px]',
+                'relative flex aspect-square min-h-[44px] flex-col items-center justify-center rounded-[10px]',
                 'transition-colors duration-200 ease-apple',
                 today && 'ring-2 ring-accent',
                 inMonth

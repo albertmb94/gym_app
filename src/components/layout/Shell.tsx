@@ -1,6 +1,6 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { Home, History, BarChart2, User, Dumbbell, MoreHorizontal, LogOut, CloudOff, Cloud, AlertTriangle, Loader2, Sun, Moon } from 'lucide-react';
+import { Home, History, BarChart2, User, Dumbbell, MoreHorizontal, LogOut, CloudOff, Cloud, AlertTriangle, Loader2, Sun, Moon, Calendar, Layers } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { cn } from '../../utils/cn';
@@ -70,14 +70,16 @@ function SyncBadge({ status, onClick }: { status: SyncState; onClick: () => void
       type="button"
       onClick={onClick}
       aria-live="polite"
+      aria-label={label}
+      title={label}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium',
+        'inline-flex h-8 w-8 items-center justify-center rounded-full border sm:h-auto sm:w-auto sm:gap-1.5 sm:px-2.5 sm:py-1',
         'transition-colors duration-150 ease-apple',
         variantClass,
       )}
     >
-      <Icon className={cn('h-3.5 w-3.5', variant === 'pending' && 'animate-spin')} aria-hidden="true" />
-      <span>{label}</span>
+      <Icon className={cn('h-4 w-4', variant === 'pending' && 'animate-spin')} aria-hidden="true" />
+      <span className="hidden sm:inline text-[12px] font-medium">{label}</span>
     </button>
   );
 }
@@ -189,7 +191,7 @@ export default function Shell({
         role="banner"
         className="sticky top-0 z-40 glass-2 border-b border-app"
       >
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4 safe-top">
+        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-2 px-4 safe-top">
           <Link to="/" className="flex items-center gap-2 text-primary" aria-label={t.app.name}>
             <span
               aria-hidden="true"
@@ -200,9 +202,9 @@ export default function Shell({
             </span>
             <span className="text-[15px] font-semibold tracking-tight">{t.app.name}</span>
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <SyncBadge status={syncStatus} onClick={onForceSync} />
-            <span className="max-w-[8rem] truncate text-[13px] text-secondary">{username}</span>
+            <span className="hidden md:inline max-w-[8rem] truncate text-[13px] text-secondary">{username}</span>
             <ThemeToggle />
             <button
               type="button"
@@ -217,18 +219,19 @@ export default function Shell({
       </header>
 
       <main
-        key={location.pathname}
         id="main-content"
-        className="animate-fade relative mx-auto w-full max-w-5xl px-4 pb-28 pt-4 sm:pb-8"
+        className="animate-fade relative mx-auto w-full max-w-5xl px-4 pt-4"
+        style={{ paddingBottom: 'var(--bottom-nav-h-safe)' }}
       >
         {children}
       </main>
 
+      {/* Bottom nav — fixed (BUG 1) para garantizar que se queda en el inferior */}
       <nav
         aria-label={t.nav.primary}
-        className="sticky bottom-0 z-40 glass-2 border-t border-app safe-bottom"
+        className="fixed inset-x-0 bottom-0 z-40 glass-2 border-t border-app safe-bottom"
       >
-        <div className="mx-auto flex h-16 max-w-5xl items-stretch justify-around px-2">
+        <div className="mx-auto flex h-16 max-w-5xl items-stretch justify-around px-1">
           {PRIMARY_NAV.map((item) => {
             const active = location.pathname === item.to ||
               (item.matchPaths?.some((p) => location.pathname === p) ?? false);
@@ -240,8 +243,9 @@ export default function Shell({
                 to={item.to}
                 end={item.to === '/'}
                 aria-current={active ? 'page' : undefined}
+                aria-label={label}
                 className={cn(
-                  'group flex min-w-[56px] flex-1 flex-col items-center justify-center gap-0.5 rounded-[12px] text-[11px] font-medium',
+                  'group flex min-w-[44px] flex-1 flex-col items-center justify-center gap-0.5 rounded-[12px] text-[11px] font-medium',
                   'transition-colors duration-150 ease-apple',
                   active ? 'text-accent' : 'text-muted hover:text-primary',
                 )}
@@ -254,7 +258,7 @@ export default function Shell({
                 >
                   <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
                 </span>
-                <span>{label}</span>
+                <span className="hidden sm:inline">{label}</span>
               </NavLink>
             );
           })}
@@ -263,8 +267,9 @@ export default function Shell({
             onClick={() => setMoreOpen((v) => !v)}
             aria-expanded={moreOpen}
             aria-haspopup="menu"
+            aria-label={t.nav.more}
             className={cn(
-              'flex min-w-[56px] flex-1 flex-col items-center justify-center gap-0.5 rounded-[12px] text-[11px] font-medium',
+              'flex min-w-[44px] flex-1 flex-col items-center justify-center gap-0.5 rounded-[12px] text-[11px] font-medium',
               'transition-colors duration-150 ease-apple',
               moreOpen ? 'text-accent' : 'text-muted hover:text-primary',
             )}
@@ -277,39 +282,44 @@ export default function Shell({
             >
               <MoreHorizontal className="h-[18px] w-[18px]" aria-hidden="true" />
             </span>
-            <span>{t.nav.more}</span>
+            <span className="hidden sm:inline">{t.nav.more}</span>
           </button>
         </div>
 
+        {/* Submenú "Más" — absolute bottom-full, aparece ENCIMA del nav (BUG 4) */}
         {moreOpen && (
           <div
             role="menu"
-            className="mx-auto mb-2 max-w-5xl rounded-[20px] glass-2 p-2 shadow-[var(--shadow-dialog)]"
+            aria-label={t.nav.more}
+            className="absolute inset-x-0 bottom-full mb-2 px-2"
           >
-            <div className="grid gap-1 sm:grid-cols-2">
-              {[
-                { to: '/plan', label: t.nav.plan, icon: Home },
-                { to: '/exercises', label: t.nav.exercises, icon: Dumbbell },
-              ].map((entry) => {
-                const Icon = entry.icon;
-                const active = location.pathname === entry.to;
-                return (
-                  <NavLink
-                    key={entry.to}
-                    to={entry.to}
-                    role="menuitem"
-                    aria-current={active ? 'page' : undefined}
-                    className={cn(
-                      'flex items-center gap-3 rounded-[12px] px-3 py-3 text-[14px] font-medium',
-                      'transition-colors duration-150 ease-apple',
-                      active ? 'bg-accent-soft text-accent' : 'text-secondary hover:bg-surface-2 hover:text-primary',
-                    )}
-                  >
-                    <Icon className="h-4 w-4" aria-hidden="true" />
-                    <span>{entry.label}</span>
-                  </NavLink>
-                );
-              })}
+            <div className="mx-auto max-w-5xl rounded-[20px] glass-2 p-2 shadow-[var(--shadow-dialog)]">
+              <div className="grid gap-1 sm:grid-cols-2">
+                {[
+                  { to: '/plan', label: t.nav.plan, icon: Calendar },
+                  { to: '/exercises', label: t.nav.exercises, icon: Layers },
+                ].map((entry) => {
+                  const Icon = entry.icon;
+                  const active = location.pathname === entry.to;
+                  return (
+                    <NavLink
+                      key={entry.to}
+                      to={entry.to}
+                      role="menuitem"
+                      aria-current={active ? 'page' : undefined}
+                      onClick={() => setMoreOpen(false)}
+                      className={cn(
+                        'flex items-center gap-3 rounded-[12px] px-3 py-3 text-[14px] font-medium',
+                        'transition-colors duration-150 ease-apple',
+                        active ? 'bg-accent-soft text-accent' : 'text-secondary hover:bg-surface-2 hover:text-primary',
+                      )}
+                    >
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                      <span>{entry.label}</span>
+                    </NavLink>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}

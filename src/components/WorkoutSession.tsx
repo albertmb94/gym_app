@@ -56,10 +56,14 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
   onSaveRef.current = onSave;
   const sessionRef = useRef(session);
   sessionRef.current = session;
+  // BUG 8: a ref que indica si la vista sigue activa. Evita que un evento
+  // diferido (visibilitychange / pagehide) dispare onSave tras cerrar.
+  const isActiveRef = useRef(true);
 
   const autoSave = () => {
+    if (!isActiveRef.current) return;
     const s = sessionRef.current;
-    if (s.exercises.length === 0) return;
+    if (!s || s.exercises.length === 0) return;
     onSaveRef.current(s);
   };
 
@@ -70,10 +74,12 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
   }, [session]);
 
   useEffect(() => {
+    isActiveRef.current = true;
     const onVisibility = () => { if (document.hidden) autoSave(); };
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('pagehide', autoSave);
     return () => {
+      isActiveRef.current = false;
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pagehide', autoSave);
     };
@@ -161,11 +167,11 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
 
     const getIdxAtY = (clientY: number): number | null => {
       if (!exerciseListRef.current) return null;
-      const cards = exerciseListRef.current.querySelectorAll<HTMLElement>('[data-drag-idx]');
+      const cards = exerciseListRef.current.querySelectorAll<HTMLElement>('[data-exercise-idx]');
       for (const card of cards) {
         const rect = card.getBoundingClientRect();
         if (clientY >= rect.top && clientY <= rect.bottom) {
-          return parseInt(card.dataset.dragIdx ?? '-1');
+          return parseInt(card.dataset.exerciseIdx ?? '-1');
         }
       }
       return null;
@@ -184,10 +190,12 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
       performDrop(dragOverIndexRef.current);
       document.removeEventListener('touchmove', onTouchMove);
       document.removeEventListener('touchend', onTouchEnd);
+      document.removeEventListener('touchcancel', onTouchEnd);
     };
 
     document.addEventListener('touchmove', onTouchMove, { passive: false });
     document.addEventListener('touchend', onTouchEnd);
+    document.addEventListener('touchcancel', onTouchEnd);
   };
 
   // ── Set mutations ────────────────────────────────────────────────────────
@@ -309,7 +317,7 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
                   ? 'bg-accent text-on-accent shadow-[0_4px_14px_-4px_color-mix(in_srgb,var(--accent)_60%,transparent)]'
                   : 'bg-surface-2 text-primary border border-app',
               )}
-              aria-label={timerRunning ? t.workout.timer : t.workout.timer}
+              aria-label={timerRunning ? t.workout.stopTimer : t.workout.startTimer}
             >
               {timerRunning ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
               {formatTime(timer)}
@@ -360,7 +368,7 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
           return (
             <article
               key={exLog.id}
-              data-drag-idx={idx}
+              data-exercise-idx={idx}
               draggable
               onDragStart={() => handleDragStart(idx)}
               onDragOver={(e) => handleDragOver(e, idx)}
@@ -626,7 +634,6 @@ export default function WorkoutSession({ session: initialSession, onSave, onClos
             onChange={e => setExerciseSearch(e.target.value)}
             placeholder={t.workout.searchExercises}
             className="block w-full rounded-[12px] border border-app bg-surface-2 py-2.5 pl-10 pr-3 text-[14px] text-primary placeholder:text-muted focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            autoFocus
           />
         </div>
         <ul className="space-y-1.5">

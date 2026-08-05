@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import { es, enUS } from 'date-fns/locale';
 import { TrendingUp, BarChart2, Activity, Flame, Heart, X } from 'lucide-react';
 import { EmptyState } from './ui/EmptyState';
+import { Select } from './ui/Select';
 import { cn } from '../utils/cn';
 
 interface Props {
@@ -341,15 +342,11 @@ export default function StatsTab({ sessions, cardioSessions = [] }: Props) {
             <>
               <div>
                 <label className="text-[13px] text-secondary mb-2 block">{t.stats.exercise}</label>
-                <select
+                <Select
                   value={effectiveExerciseId}
                   onChange={e => setSelectedExerciseId(e.target.value)}
-                  className="w-full bg-surface-2 border border-app rounded-[12px] px-3 py-2.5 text-primary focus-visible:outline-none focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent"
-                >
-                  {usedExercises.map(ex => (
-                    <option key={ex.id} value={ex.id}>{ex.name}</option>
-                  ))}
-                </select>
+                  options={usedExercises.map(ex => ({ value: ex.id, label: ex.name }))}
+                />
               </div>
 
               {exerciseData.length > 0 ? (
@@ -404,18 +401,14 @@ export default function StatsTab({ sessions, cardioSessions = [] }: Props) {
 
                 {/* Add exercise */}
                 {compareExerciseIds.length < 4 && (
-                  <select
-                    defaultValue=""
+                  <Select
+                    value=""
                     onChange={e => { if (e.target.value) { addCompareExercise(e.target.value); e.target.value = ''; } }}
-                    className="w-full bg-surface-2 border border-app rounded-[10px] px-3 py-2 text-[13px] text-primary focus-visible:outline-none focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent"
-                  >
-                    <option value="" disabled>{t.stats.addExercise}</option>
-                    {usedExercises
+                    options={usedExercises
                       .filter(ex => !compareExerciseIds.includes(ex.id))
-                      .map(ex => (
-                        <option key={ex.id} value={ex.id}>{ex.name}</option>
-                      ))}
-                  </select>
+                      .map(ex => ({ value: ex.id, label: ex.name }))}
+                    placeholder={t.stats.addExercise}
+                  />
                 )}
 
                 {/* Selected exercises tags */}
@@ -508,15 +501,11 @@ export default function StatsTab({ sessions, cardioSessions = [] }: Props) {
             <>
               <div>
                 <label className="text-[13px] text-secondary mb-2 block">{t.stats.muscle}</label>
-                <select
+                <Select
                   value={selectedMuscle}
                   onChange={e => setSelectedMuscle(e.target.value as MuscleGroup)}
-                  className="w-full bg-surface-2 border border-app rounded-[12px] px-3 py-2.5 text-primary focus-visible:outline-none focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent"
-                >
-                  {ALL_MUSCLES.map(m => (
-                    <option key={m} value={m}>{muscleLabels[m] || m}</option>
-                  ))}
-                </select>
+                  options={ALL_MUSCLES.map(m => ({ value: m, label: muscleLabels[m] || m }))}
+                />
               </div>
 
               {muscleData.length > 0 ? (
